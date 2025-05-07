@@ -1,6 +1,5 @@
 import argparse
-
-
+import os
 
 parser = argparse.ArgumentParser("VOACAPextractor")
 _ = parser.add_argument("hour", help="The hour that will extracted from")
@@ -8,7 +7,7 @@ _ = parser.add_argument("field", help="The field that will extracted")
 _ = parser.add_argument("-i", "--input", 
                         help="The file to extract data from. Default ~/itshfbc/run/voacapx.out",
                         required=False,
-                        default="/home/theodorb/itshfbc/run/voacapx.out")
+                        default=os.path.expanduser("~/itshfbc/run/voacapx.out"))
 _ = parser.add_argument("-f", "--frequency", 
                         help="The frequency that will extracted. Default all",
                         required=False,
