@@ -1,0 +1,21 @@
+{
+  "time_period": {
+    "from": "2025-01",
+    "to": "2025-02"
+  },
+  "noise_levels": {
+    "Noisy": 139,
+    "Industrial": 140,
+    "Residential": 145,
+    "Rural": 150,
+    "Quiet": 153,
+    "Remote": 164
+  },
+  "circuits": [
+    {
+      "tx": "WW0WWV",
+      "rx": "EA8BFK",
+      "noise": "Residential"
+    }
+  ]
+}
