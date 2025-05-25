@@ -25,7 +25,7 @@ def one_month(circuit, current_date):
     rx_lat = info['rx_lat']
     rx_lon = info['rx_lon']
 
-    MONTH = current_date.strftime("%Y %m.00")
+    MONTH = current_date.strftime("%Y %m.00")   #.00 is needed for VOACAP config
     SSN = next((item['ssn'] for item in SSN_DATA if item['time-tag'] == current_date.strftime("%Y-%m")))
     TX = circuit["tx"]
     RX = circuit["rx"]
