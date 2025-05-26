@@ -1,8 +1,14 @@
 import json
 from datetime import datetime
+from pathlib import Path
+
 from dateutil.relativedelta import relativedelta
-from wspr import wsprlive_get_info, wsprlive_pull_one_month
-from voacap import run_voacap
+
+from tools.plots import make_plots
+from tools.voacap import run_voacap
+from tools.voacap_extractor import extract
+from tools.voacap_extractor import get_freq
+from tools.wspr import wsprlive_get_info, wsprlive_pull_one_month
 
 global FROM_DATE, TO_DATE, CONFIG, SSN_DATA
 
@@ -25,7 +31,7 @@ def one_month(circuit, current_date):
     rx_lat = info['rx_lat']
     rx_lon = info['rx_lon']
 
-    MONTH = current_date.strftime("%Y %m.00")
+    MONTH = current_date.strftime("%Y %m.00")  # .00 is needed for VOACAP config
     SSN = next((item['ssn'] for item in SSN_DATA if item['time-tag'] == current_date.strftime("%Y-%m")))
     TX = circuit["tx"]
     RX = circuit["rx"]
@@ -37,9 +43,7 @@ def one_month(circuit, current_date):
     wsprlive_pull_one_month(TX, RX, MONTH, current_date)
 
 
-def main():
-    read_config()
-
+def prep_data():
     for circuit in CONFIG["circuits"]:
         circuit["noise"] = CONFIG["noise_levels"].get(circuit["noise"])  # Translate noise
 
@@ -48,6 +52,27 @@ def main():
             one_month(circuit, current_date)
             current_date += relativedelta(months=1)
 
+
+def plot():
+    dirs = sorted([p for p in Path("data/data").glob("*/*") if p.is_dir()])
+    for path in dirs:
+        voacapx = path / "voacapx.out"
+        tx, rx = path.parent.name.split("_")
+        print(f"\n Going through: {path}")
+        for band in get_freq(voacapx):
+            print(f"\tPlotting for band: {band}")
+            snr = [d["value"] for d in extract("SNR", voacapx, band=band)]
+            snrup = [d["value"] for d in extract("SNR UP", voacapx, band=band)]
+            snrlw = [d["value"] for d in extract("SNR LW", voacapx, band=band)]
+
+            make_plots(path, band, snr, snrup, snrlw, tx, rx)
+
+
+def main():
+    read_config()
+    prep_data()
+    plot()
+    print("\n Done!")
 
 if __name__ == "__main__":
     main()
