@@ -4,7 +4,7 @@ from pathlib import Path
 
 from dateutil.relativedelta import relativedelta
 
-from tools.distro import make_plots
+from tools.plots import make_plots
 from tools.voacap import run_voacap
 from tools.voacap_extractor import extract
 from tools.voacap_extractor import get_freq

@@ -1,16 +1,11 @@
 import json
+from collections import Counter
+from datetime import datetime
+from pathlib import Path
 
-import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import psycopg2
-import scipy.stats as stats
-import statistics
-import math
-import argparse
-from datetime import datetime
-from collections import Counter
-from pathlib import Path
+import numpy as np
 
 mpl.use("pgf")
 mpl.rcParams.update({
@@ -196,13 +191,3 @@ def make_plots(path: Path, band: int, snr: list[float], snr_up: list[float], snr
     prep_data()
     plot_errors_bars()
     plot_hour_normal_distros()
-
-
-def main():
-    prep_data()
-    # some()
-    plot_hour_normal_distros()
-
-
-if __name__ == "__main__":
-    main()
