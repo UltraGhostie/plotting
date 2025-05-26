@@ -41,6 +41,6 @@ QUIT"""
     config_path.write_text(config)
     subprocess.run(["voacapl", str(Path.home() / "itshfbc")], check=True)
 
-    path = Path("data") / "voacap" / f"{TX}_{RX}"
+    path = Path("data") / "data" / f"{TX}_{RX}" / f"{MONTH.replace(" ", "_")}"
     path.mkdir(parents=True, exist_ok=True)
-    output_path.rename(path / f"{MONTH.replace(" ", "_")}.out")
+    output_path.rename(path / "voacapx.out")
