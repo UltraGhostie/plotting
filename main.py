@@ -3,6 +3,7 @@ import os.path
 import shutil
 from datetime import datetime
 from pathlib import Path
+from itertools import zip_longest
 
 from dateutil.relativedelta import relativedelta
 
@@ -76,11 +77,62 @@ def plot():
             make_plots(path, band, snr, snrup, snrlw, tx, rx)
 
 
+def make_latex():
+    output_path = Path("data/import_figures.tex")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_path, "w") as f:
+        beacon_dirs = sorted([p for p in Path("data/figures").glob("*") if p.is_dir()])
+        for beacon_path in beacon_dirs:
+            tx, rx = beacon_path.name.split("_")
+            print(f"\\section*{{TX:{tx} RX:{rx}}}", file=f)
+
+            month_dirs = sorted([p for p in beacon_path.glob("*") if p.is_dir()])
+            for month_path in month_dirs:
+                dt = datetime.strptime(month_path.name, "%Y_%m.00")
+                month = dt.strftime("%B %Y")
+                print("\t", f"\\subsection*{{{month}}}", sep="", file=f)
+
+                band_dirs = sorted(
+                    (p for p in month_path.glob("*") if p.name.isdigit()),
+                    key=lambda p: int(p.name)
+                )
+                for band_path in band_dirs:
+                    print("\t\t", f"\\subsubsection*{{Band: {band_path.name}}}\\hspace{{0pt}}", sep="", file=f)
+
+                    fig_dirs = sorted(band_path.glob("*.pgf"))
+                    for i, (left, right) in enumerate(zip_longest(fig_dirs[::2], fig_dirs[1::2])):
+                        print("""\
+            \\begin{minipage}{0.48\\textwidth}
+                \\centering
+                \\resizebox{\\linewidth}{!}{%
+                    \\input{""", left, "}", "\n\t\t\t\t\t}", sep="", file=f)
+                        print("\t\t\t\t\t", f"\\captionof{{figure}}{{{"LEFT"}}}", sep="", file=f)
+                        print("\t\t\t\t\t", f"\\label{{fig:{str(left).replace("/", "-")}}}", sep="", file=f)
+                        print("""\
+            \\end{minipage}
+            \\hfill""", file=f)
+                        if right:
+                            print("""\
+            \\begin{minipage}{0.48\\textwidth}
+                \\centering
+                \\resizebox{\\linewidth}{!}{%
+                    \\input{""", right, "}", "\n\t\t\t\t\t}", sep="", file=f)
+                            print("\t\t\t\t\t", f"\\captionof{{figure}}{{{"RIGHT"}}}", sep="", file=f)
+                            print("\t\t\t\t\t", f"\\label{{fig:{str(right).replace("/", "-")}}}", sep="", file=f)
+                            print("""\
+            \\end{minipage}""", file=f)
+                        #print("\t\t\t\t\\end{figure*}", file=f)
+                        #if i % 3 == 2: print("\\clearpage", file=f)
+
+
 def main():
     read_config()
-    prep_data()
-    plot()
+    # prep_data()
+    # plot()
+    make_latex()
     print("\n Done!")
+
 
 if __name__ == "__main__":
     main()
