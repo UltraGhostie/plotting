@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-def get_freq(filepath: Path):
+def get_band(filepath: Path):
     with open(filepath) as file:
         for line in file:
             line = line.strip()

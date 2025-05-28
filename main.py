@@ -3,14 +3,15 @@ import os.path
 import shutil
 from datetime import datetime
 from pathlib import Path
-from itertools import zip_longest
+from zoneinfo import ZoneInfo
 
 from dateutil.relativedelta import relativedelta
+from timezonefinder import TimezoneFinder
 
+from tools.latex import make_latex
 from tools.plots import make_plots
 from tools.voacap import run_voacap
-from tools.voacap_extractor import extract
-from tools.voacap_extractor import get_freq
+from tools.voacap_extractor import extract, get_band
 from tools.wspr import wsprlive_get_info, wsprlive_pull_one_month
 
 global FROM_DATE, TO_DATE, CONFIG, SSN_DATA
@@ -23,8 +24,8 @@ def read_config():
     CONFIG = json.load(open('config.json'))
     time_period = CONFIG['time_period']
 
-    FROM_DATE = datetime.strptime(time_period['from'] + "-01", "%Y-%m-%d").date()
-    TO_DATE = datetime.strptime(time_period['to'] + "-01", "%Y-%m-%d").date()
+    FROM_DATE = datetime.strptime(time_period['from'] + "-01", "%Y-%m-%d").replace(tzinfo=ZoneInfo("UTC")).date()
+    TO_DATE = datetime.strptime(time_period['to'] + "-01", "%Y-%m-%d").replace(tzinfo=ZoneInfo("UTC")).date()
 
 
 def one_month(circuit, current_date):
@@ -33,6 +34,9 @@ def one_month(circuit, current_date):
     tx_lon = info['tx_lon']
     rx_lat = info['rx_lat']
     rx_lon = info['rx_lon']
+
+    #time_zone = TimezoneFinder().timezone_at(lat=rx_lat, lng=rx_lon)
+    #current_date = current_date.astimezone(ZoneInfo(time_zone))
 
     MONTH = current_date.strftime("%Y %m.00")  # .00 is needed for VOACAP config
     SSN = next((item['ssn'] for item in SSN_DATA if item['time-tag'] == current_date.strftime("%Y-%m")))
@@ -68,67 +72,18 @@ def plot():
         voacapx = path / "voacapx.out"
         tx, rx = path.parent.name.split("_")
         print(f"\n Going through: {path}")
-        for band in get_freq(voacapx):
+        for band in get_band(voacapx):
             print(f"\tPlotting for band: {band}")
             snr = [d["value"] for d in extract("SNR", voacapx, band=band)]
             snrup = [d["value"] for d in extract("SNR UP", voacapx, band=band)]
             snrlw = [d["value"] for d in extract("SNR LW", voacapx, band=band)]
 
-            make_plots(path, band, snr, snrup, snrlw, tx, rx)
-
-
-def make_latex():
-    output_path = Path("data/import_figures.tex")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(output_path, "w") as f:
-        beacon_dirs = sorted([p for p in Path("data/figures").glob("*") if p.is_dir()])
-        for beacon_path in beacon_dirs:
-            tx, rx = beacon_path.name.split("_")
-            print(f"\\section*{{TX:{tx} RX:{rx}}}", file=f)
-
-            month_dirs = sorted([p for p in beacon_path.glob("*") if p.is_dir()])
-            for month_path in month_dirs:
-                dt = datetime.strptime(month_path.name, "%Y_%m.00")
-                month = dt.strftime("%B %Y")
-                print("\t", f"\\subsection*{{{month}}}", sep="", file=f)
-
-                band_dirs = sorted(
-                    (p for p in month_path.glob("*") if p.name.isdigit()),
-                    key=lambda p: int(p.name)
-                )
-                for band_path in band_dirs:
-                    print("\t\t", f"\\subsubsection*{{Band: {band_path.name}}}\\hspace{{0pt}}", sep="", file=f)
-
-                    fig_dirs = sorted(band_path.glob("*.pgf"))
-                    for i, (left, right) in enumerate(zip_longest(fig_dirs[::2], fig_dirs[1::2])):
-                        print("""\
-            \\begin{minipage}{0.48\\textwidth}
-                \\centering
-                \\resizebox{\\linewidth}{!}{%
-                    \\input{""", left, "}", "\n\t\t\t\t\t}", sep="", file=f)
-                        print("\t\t\t\t\t", f"\\captionof{{figure}}{{{"LEFT"}}}", sep="", file=f)
-                        print("\t\t\t\t\t", f"\\label{{fig:{str(left).replace("/", "-")}}}", sep="", file=f)
-                        print("""\
-            \\end{minipage}
-            \\hfill""", file=f)
-                        if right:
-                            print("""\
-            \\begin{minipage}{0.48\\textwidth}
-                \\centering
-                \\resizebox{\\linewidth}{!}{%
-                    \\input{""", right, "}", "\n\t\t\t\t\t}", sep="", file=f)
-                            print("\t\t\t\t\t", f"\\captionof{{figure}}{{{"RIGHT"}}}", sep="", file=f)
-                            print("\t\t\t\t\t", f"\\label{{fig:{str(right).replace("/", "-")}}}", sep="", file=f)
-                            print("""\
-            \\end{minipage}""", file=f)
-                        #print("\t\t\t\t\\end{figure*}", file=f)
-                        #if i % 3 == 2: print("\\clearpage", file=f)
+            make_plots(path, band, snr, snrup, snrlw)
 
 
 def main():
     read_config()
-    # prep_data()
+    prep_data()
     # plot()
     make_latex()
     print("\n Done!")

@@ -6,9 +6,10 @@ from pathlib import Path
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+from lxml.html.builder import CAPTION
 
 mpl.use("pgf")
-mpl.rcParams.update({
+plt.rcParams.update({
     "pgf.texsystem": "pdflatex",  # sudo apt install texlive-full
     "font.family": "serif",  # use LaTeX serif font
     "font.size": 11,
@@ -18,7 +19,6 @@ mpl.rcParams.update({
 
 SNR_OFFSET = 34  # SNR offset to compensate for bandwidth differences between VOACAP and WSPR
 HOURS = range(24)
-BAND = None
 
 DATA = {}
 PATH = Path()
@@ -37,7 +37,7 @@ dSNR: list[float] = []
 dUP: list[float] = []
 dLW: list[float] = []
 
-LABELS: list[str] = []
+CAPTIONS = {}
 
 
 def prep_data():
@@ -50,10 +50,10 @@ def prep_data():
             in DATA
             if datetime.strptime(entry["time"], "%Y-%m-%d %H:%M:%S").hour == H
         ])
-        DISTRO_W.append((snr_hour.__len__(), list(Counter(snr_hour).items())))
-        LABELS.append(str(H))
 
-        if snr_hour:
+        if len(snr_hour) >= 30:
+            DISTRO_W.append((len(snr_hour), list(Counter(snr_hour).items())))
+
             median = float(np.percentile(snr_hour, 50))
             SNR_W.append(median)
             o_UP_W.append(abs(median - float(np.percentile(snr_hour, 90))) / 1.28)
@@ -63,6 +63,8 @@ def prep_data():
             dUP.append(o_UP_W[H] - o_UP_V[H])
             dLW.append(o_LW_W[H] - o_LW_V[H])
         else:
+            DISTRO_W.append((0, []))
+
             SNR_W.append(np.nan)
             o_UP_W.append(np.nan)
             o_LW_W.append(np.nan)
@@ -73,9 +75,9 @@ def prep_data():
 
 
 def plot_errors_bars():
-    global BAND, HOURS, dSNR, dUP, dLW, LABELS
+    global HOURS, dSNR, dUP, dLW
 
-    fig, ax = plt.subplots(constrained_layout=True) #figsize=(12, 4)
+    fig, ax = plt.subplots(constrained_layout=True)  # figsize=(12, 4)
 
     bar_width = 0.6 / 3
     x = np.arange(len(HOURS))
@@ -84,9 +86,9 @@ def plot_errors_bars():
     ax.bar(x, dUP, color="#CC0000", lw=1, label=r"$\Delta \sigma_\mathrm{UP}$", width=bar_width)
     ax.bar(x + bar_width, dLW, color="#2CA02C", lw=1, label=r"$\Delta \sigma_\mathrm{LW}$", width=bar_width)
 
-    ax.set_title(f"Errors in band \\#{str(BAND)}")
-    ax.set_ylabel("SNR (dB·Hz)")
-    ax.set_xlabel("Hour of the day")
+    ax.set_title("Hourly VOACAP Parameter Deviations from WSPR")
+    ax.set_ylabel("Deviation (dB·Hz)")
+    ax.set_xlabel("Hour (Receiver Local Time)")
 
     ax.set_xticks(x)
     ax.margins(x=0.01, y=0.01)
@@ -96,8 +98,20 @@ def plot_errors_bars():
     ax.grid(True, which='major', alpha=0.5)
     ax.grid(True, which='minor', alpha=0.3)
 
-    fig.savefig(PATH / "error_bars.pgf")
-    # plt.show()
+    avg_dsnr = np.nanmean(np.abs(np.array(dSNR)))
+    avg_dup = np.nanmean(np.abs(np.array(dUP)))
+    avg_dlw = np.nanmean(np.abs(np.array(dLW)))
+    latex_caption = (
+        rf"Average deviations: "
+        rf"$\overline{{\Delta \mathrm{{SNR}}}} = {avg_dsnr:.2f}\,\mathrm{{dB\cdot Hz}}$, "
+        rf"$\overline{{\Delta \sigma_\mathrm{{UP}}}} = {avg_dup:.2f}\,\mathrm{{dB\cdot Hz}}$, "
+        rf"$\overline{{\Delta \sigma_\mathrm{{LW}}}} = {avg_dlw:.2f}\,\mathrm{{dB\cdot Hz}}$"
+    )
+
+    path = PATH / "error_bars.pdf"
+    CAPTIONS[path] = latex_caption
+
+    fig.savefig(path)
     plt.close(fig)
 
 
@@ -136,7 +150,7 @@ def plot_hour_normal_distros():
         )
 
         # Plot both on the same axes
-        fig, ax = plt.subplots(constrained_layout=True) #figsize=(10, 10),
+        fig, ax = plt.subplots(constrained_layout=True)  # figsize=(10, 10),
 
         label1, = ax.plot(snr, prob, lw=1, color="#0052CC", label="WSPR")
         ax.fill_between(snr, 0, prob, alpha=0.2)
@@ -145,7 +159,7 @@ def plot_hour_normal_distros():
         label3, = ax.plot(x, pdf2, lw=1, color="#2CA02C", label="VOACAP")
         ax.fill_between(x, 0, pdf2, alpha=0.2)
 
-        ax.set_title(f"Band \\#{BAND} Hour {H}")
+        ax.set_title(f"SNR distribution (Hour {H})")
         ax.set_ylabel("Probability")
         ax.set_xlabel("SNR (dB·Hz)")
 
@@ -159,21 +173,19 @@ def plot_hour_normal_distros():
         ax.grid(True, which='major', alpha=0.5)
         ax.grid(True, which='minor', alpha=0.3)
 
-        fig.savefig(PATH / f"normal_h{H}.pgf")
-        # plt.show()
+        fig.savefig(PATH / f"normal_h{H}.pdf")
         plt.close(fig)
 
 
-def make_plots(path: Path, band: int, snr: list[float], snr_up: list[float], snr_lw: list[float], tx: str, rx: str):
-    global DATA, BAND, SNR_V, o_UP_V, o_LW_V, SNR_W, o_UP_W, o_LW_W, DISTRO_W, dSNR, dUP, dLW, PATH
+def make_plots(path: Path, band: int, snr: list[float], snr_up: list[float], snr_lw: list[float]):
+    global DATA, CAPTIONS, SNR_V, o_UP_V, o_LW_V, SNR_W, o_UP_W, o_LW_W, DISTRO_W, dSNR, dUP, dLW, PATH
 
     DATA = json.load(open(path / f"{band}.json"))
     if not DATA: return
 
-    PATH = "data/figures" / path.relative_to(path.parent.parent)/ str(band)
+    PATH = "data/figures" / path.relative_to(path.parent.parent) / str(band)
     PATH.mkdir(parents=True, exist_ok=True)
 
-    BAND = band
     SNR_V = [s - SNR_OFFSET for s in snr]
     o_UP_V = [abs(up / 1.28) for up in snr_up]
     o_LW_V = [abs(lw / 1.28) for lw in snr_lw]
