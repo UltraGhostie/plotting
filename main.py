@@ -1,4 +1,6 @@
 import json
+import os.path
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -44,6 +46,9 @@ def one_month(circuit, current_date):
 
 
 def prep_data():
+    data_path = Path("data/data")
+    if os.path.exists(data_path): shutil.rmtree(data_path)
+
     for circuit in CONFIG["circuits"]:
         circuit["noise"] = CONFIG["noise_levels"].get(circuit["noise"])  # Translate noise
 
@@ -54,6 +59,9 @@ def prep_data():
 
 
 def plot():
+    data_path = Path("data/figures")
+    if os.path.exists(data_path): shutil.rmtree(data_path)
+
     dirs = sorted([p for p in Path("data/data").glob("*/*") if p.is_dir()])
     for path in dirs:
         voacapx = path / "voacapx.out"
