@@ -51,7 +51,7 @@ def prep_data():
             if datetime.strptime(entry["time"], "%Y-%m-%d %H:%M:%S").hour == H
         ])
 
-        if len(snr_hour) >= 30:
+        if len(snr_hour) >= 1:
             DISTRO_W.append((len(snr_hour), list(Counter(snr_hour).items())))
 
             median = float(np.percentile(snr_hour, 50))
@@ -88,7 +88,7 @@ def plot_errors_bars():
 
     ax.set_title("Hourly VOACAP Parameter Deviations from WSPR")
     ax.set_ylabel("Deviation (dB·Hz)")
-    ax.set_xlabel("Hour (Receiver Local Time)")
+    ax.set_xlabel("Hour (UTC)")
 
     ax.set_xticks(x)
     ax.margins(x=0.01, y=0.01)
@@ -102,10 +102,10 @@ def plot_errors_bars():
     avg_dup = np.nanmean(np.abs(np.array(dUP)))
     avg_dlw = np.nanmean(np.abs(np.array(dLW)))
     latex_caption = (
-        rf"Average deviations: "
-        rf"$\overline{{\Delta \mathrm{{SNR}}}} = {avg_dsnr:.2f}\,\mathrm{{dB\cdot Hz}}$, "
-        rf"$\overline{{\Delta \sigma_\mathrm{{UP}}}} = {avg_dup:.2f}\,\mathrm{{dB\cdot Hz}}$, "
-        rf"$\overline{{\Delta \sigma_\mathrm{{LW}}}} = {avg_dlw:.2f}\,\mathrm{{dB\cdot Hz}}$"
+        rf"Average deviations:"
+        rf"\\$\overline{{\Delta \mathrm{{SNR}}}} = {avg_dsnr:.2f}\,\mathrm{{dB\cdot Hz}}$"
+        rf"\\$\overline{{\Delta \sigma_\mathrm{{UP}}}} = {avg_dup:.2f}\,\mathrm{{dB\cdot Hz}}$"
+        rf"\\$\overline{{\Delta \sigma_\mathrm{{LW}}}} = {avg_dlw:.2f}\,\mathrm{{dB\cdot Hz}}$"
     )
 
     path = PATH / "error_bars.pdf"
@@ -152,15 +152,15 @@ def plot_hour_normal_distros():
         # Plot both on the same axes
         fig, ax = plt.subplots(constrained_layout=True)  # figsize=(10, 10),
 
-        label1, = ax.plot(snr, prob, lw=1, color="#0052CC", label="WSPR")
+        label1, = ax.plot(snr, prob, lw=1, color="#0052CC", label="WSPR Observed")
         ax.fill_between(snr, 0, prob, alpha=0.2)
-        label2, = ax.plot(x, pdf1, lw=1, color="#CC0000", label="Interpolated")
+        label2, = ax.plot(x, pdf1, lw=1, color="#CC0000", label="WSPR Fitted")
         ax.fill_between(x, 0, pdf1, alpha=0.2)
-        label3, = ax.plot(x, pdf2, lw=1, color="#2CA02C", label="VOACAP")
+        label3, = ax.plot(x, pdf2, lw=1, color="#2CA02C", label="VOACAP Prediction")
         ax.fill_between(x, 0, pdf2, alpha=0.2)
 
-        ax.set_title(f"SNR distribution (Hour {H})")
-        ax.set_ylabel("Probability")
+        ax.set_title(f"SNR Distribution at Hour {H:02d} (UTC)")
+        ax.set_ylabel("Probability Density")
         ax.set_xlabel("SNR (dB·Hz)")
 
         ax.margins(x=0, y=0)
@@ -173,7 +173,16 @@ def plot_hour_normal_distros():
         ax.grid(True, which='major', alpha=0.5)
         ax.grid(True, which='minor', alpha=0.3)
 
-        fig.savefig(PATH / f"normal_h{H}.pdf")
+        latex_caption = (
+            rf"\\WSPR sample size: $n = {sample_size}$"
+            rf"\\WSPR: $\mu = {int(mu1)}$,\quad $\sigma_{{\mathrm{{UP}}}} = {o_u1:.2f}$,\quad $\sigma_{{\mathrm{{LW}}}} = {o_l1:.2f}$"
+            rf"\\VOACAP: $\mu = {int(mu2)}$,\quad $\sigma_{{\mathrm{{UP}}}} = {o_u2:.2f}$,\quad $\sigma_{{\mathrm{{LW}}}} = {o_l2:.2f}$"
+        )
+
+        path = PATH / f"normal_h{H}.pdf"
+        CAPTIONS[path] = latex_caption
+
+        fig.savefig(path)
         plt.close(fig)
 
 
