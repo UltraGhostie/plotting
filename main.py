@@ -82,7 +82,7 @@ def plot():
 
 def main():
     read_config()
-    #prep_data()
+    prep_data()
     plot()
     make_latex()
     print("\n Done!")

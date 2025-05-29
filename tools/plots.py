@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-from lxml.html.builder import CAPTION
+from scipy.stats import norm
 
 mpl.use("pgf")
 plt.rcParams.update({
@@ -37,11 +37,13 @@ dSNR: list[float] = []
 dUP: list[float] = []
 dLW: list[float] = []
 
+REQ_SNR: list[float] = []
+
 CAPTIONS = {}
 
 
 def prep_data():
-    global DATA, SNR_W, o_UP_W, o_LW_W, DISTRO_W, dSNR, dUP, dLW
+    global DATA, SNR_W, o_UP_W, o_LW_W, DISTRO_W, dSNR, dUP, dLW, REQ_SNR, SNR_OFFSET
 
     for H in HOURS:
         snr_hour = sorted([
@@ -58,6 +60,7 @@ def prep_data():
             SNR_W.append(median)
             o_UP_W.append(abs(median - float(np.percentile(snr_hour, 90))) / 1.28)
             o_LW_W.append(abs(median - float(np.percentile(snr_hour, 10))) / 1.28)
+            REQ_SNR.append(float(np.percentile(snr_hour, 1)) + SNR_OFFSET)
 
             dSNR.append(SNR_W[H] - SNR_V[H])
             dUP.append(o_UP_W[H] - o_UP_V[H])
@@ -68,6 +71,7 @@ def prep_data():
             SNR_W.append(np.nan)
             o_UP_W.append(np.nan)
             o_LW_W.append(np.nan)
+            REQ_SNR.append(np.nan)
 
             dSNR.append(np.nan)
             dUP.append(np.nan)
@@ -109,6 +113,48 @@ def plot_errors_bars():
     )
 
     path = PATH / "error_bars.pdf"
+    CAPTIONS[path] = latex_caption
+
+    fig.savefig(path)
+    plt.close(fig)
+
+
+def plot_req_snr():
+    global REQ_SNR
+
+    data = np.array(REQ_SNR)
+    data = data[~np.isnan(data)]
+
+    mu, o = norm.fit(data)
+    o_off = 4
+    x = np.linspace(mu - o_off * o, mu + o_off * o, 300)
+    pdf = norm.pdf(x, mu, o)
+
+    fig, ax = plt.subplots(constrained_layout=True)  # figsize=(10, 10),
+
+    ax.plot(x, pdf, lw=1, color="#0052CC")
+    ax.fill_between(x, 0, pdf, alpha=0.2)
+
+    ax.set_title(f"WSPR Fitted Bottom 1% SNR Distribution")
+    ax.set_ylabel("Probability Density")
+    ax.set_xlabel("SNR (dB·Hz)")
+
+    ax.margins(x=0, y=0)
+    ymin, ymax = ax.get_ylim()
+    padding = 0.05 * (ymax - ymin)
+    ax.set_ylim(ymin, ymax + padding)
+
+    ax.minorticks_on()
+    ax.grid(True, which='major', alpha=0.5)
+    ax.grid(True, which='minor', alpha=0.3)
+
+    latex_caption = (
+        rf"\\REQ SNR estimation"
+        rf"\\Sample size: $n = {len(data)}$"
+        rf"\\Fitted Normal: $\mu = {mu:.2f}$ dB$\cdot$Hz,\quad $\sigma = {o:.2f}$ dB$\cdot$Hz"
+    )
+
+    path = PATH / f"low_req_snr.pdf"
     CAPTIONS[path] = latex_caption
 
     fig.savefig(path)
@@ -179,7 +225,7 @@ def plot_hour_normal_distros():
             rf"\\VOACAP: $\mu = {int(mu2)}$,\quad $\sigma_{{\mathrm{{UP}}}} = {o_u2:.2f}$,\quad $\sigma_{{\mathrm{{LW}}}} = {o_l2:.2f}$"
         )
 
-        path = PATH / f"normal_h{H}.pdf"
+        path = PATH / f"normal_h{H:02d}.pdf"
         CAPTIONS[path] = latex_caption
 
         fig.savefig(path)
@@ -187,7 +233,7 @@ def plot_hour_normal_distros():
 
 
 def make_plots(path: Path, band: int, snr: list[float], snr_up: list[float], snr_lw: list[float]):
-    global DATA, CAPTIONS, SNR_V, o_UP_V, o_LW_V, SNR_W, o_UP_W, o_LW_W, DISTRO_W, dSNR, dUP, dLW, PATH
+    global DATA, CAPTIONS, SNR_V, o_UP_V, o_LW_V, SNR_W, o_UP_W, o_LW_W, DISTRO_W, dSNR, dUP, dLW, PATH, REQ_SNR
 
     DATA = json.load(open(path / f"{band}.json"))
     if not DATA: return
@@ -208,7 +254,9 @@ def make_plots(path: Path, band: int, snr: list[float], snr_up: list[float], snr
     dSNR.clear()
     dUP.clear()
     dLW.clear()
+    REQ_SNR.clear()
 
     prep_data()
     plot_errors_bars()
+    plot_req_snr()
     plot_hour_normal_distros()
