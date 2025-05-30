@@ -3,6 +3,7 @@ from pathlib import Path
 from itertools import zip_longest
 from tools.plots import CAPTIONS
 
+FIGURE_POINT_PATH: Path = Path("data/figures/point")
 
 def write_section(tx: str, rx: str, f):
     f.write(f"\\section*{{\\textbf{{TX}}:{tx} \\quad | \\quad \\textbf{{RX}}:{rx}}}\n")
@@ -34,7 +35,7 @@ def make_latex():
 
     fig_count = 1
     with open(output_path, "w") as f:
-        beacon_dirs = sorted([p for p in Path("data/figures").glob("*") if p.is_dir()])
+        beacon_dirs = sorted([p for p in FIGURE_POINT_PATH.glob("*") if p.is_dir()])
 
         for beacon_path in beacon_dirs:
             tx, rx = beacon_path.name.split("_")

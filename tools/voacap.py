@@ -1,6 +1,7 @@
 import subprocess
 from pathlib import Path
 
+DATA_POINT_PATH: Path = Path("data/data/point")
 
 def run_voacap(MONTH, SSN, TX, RX, CIRCUIT, NOISE, POWER):
     config = f"""\
@@ -41,6 +42,6 @@ QUIT"""
     config_path.write_text(config)
     subprocess.run(["voacapl", str(Path.home() / "itshfbc")], check=True)
 
-    path = Path("data") / "data" / f"{TX}_{RX}" / f"{MONTH.replace(" ", "_")}"
+    path = DATA_POINT_PATH / f"{TX}_{RX}" / f"{MONTH.replace(" ", "_")}"
     path.mkdir(parents=True, exist_ok=True)
     output_path.rename(path / "voacapx.out")

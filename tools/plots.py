@@ -22,6 +22,7 @@ HOURS = range(24)
 
 DATA = {}
 PATH = Path()
+FIGURE_POINT_PATH: Path = Path("data/figures/point")
 
 SNR_V = []
 o_UP_V = []
@@ -238,7 +239,7 @@ def make_plots(path: Path, band: int, snr: list[float], snr_up: list[float], snr
     DATA = json.load(open(path / f"{band}.json"))
     if not DATA: return
 
-    PATH = "data/figures" / path.relative_to(path.parent.parent) / str(band)
+    PATH = FIGURE_POINT_PATH / path.relative_to(path.parent.parent) / str(band)
     PATH.mkdir(parents=True, exist_ok=True)
 
     SNR_V = [s - SNR_OFFSET for s in snr]

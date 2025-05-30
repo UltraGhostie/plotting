@@ -1,6 +1,8 @@
+import asyncio
 import json
 import os.path
 import shutil
+import math
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -12,9 +14,26 @@ from tools.latex import make_latex
 from tools.plots import make_plots
 from tools.voacap import run_voacap
 from tools.voacap_extractor import extract, get_band
-from tools.wspr import wsprlive_get_info, wsprlive_pull_one_month
+from tools.wspr import wsprlive_get_info, wsprlive_pull_one_month, wsprlive_get_info_group, \
+    wsprlive_pull_one_month_async
 
 global FROM_DATE, TO_DATE, CONFIG, SSN_DATA
+
+ALPHA: float = 15
+EARTH_LAT: float = 40007.863
+EARTH_LON: float = 40075.017
+
+DATA_POINT_PATH: Path = Path("data/data/point")
+FIGURE_POINT_PATH: Path = Path("data/figures/point")
+
+DATA_GROUP_PATH: Path = Path("data/data/group")
+
+def _r_lat(r: float):
+    return (r * 360) / EARTH_LAT
+
+
+def _r_lon(r: float, rx_lat: float):
+    return (r * 360) / (EARTH_LON * math.cos((rx_lat * math.pi) / 180))
 
 
 def read_config():
@@ -29,13 +48,13 @@ def read_config():
 
 
 def one_month(circuit, current_datetime):
-    info = wsprlive_get_info(circuit, current_datetime)
-    if not info: return
+    properties = wsprlive_get_info(circuit, current_datetime)
+    if not properties: return
 
-    tx_lat = info['tx_lat']
-    tx_lon = info['tx_lon']
-    rx_lat = info['rx_lat']
-    rx_lon = info['rx_lon']
+    tx_lat = properties['tx_lat']
+    tx_lon = properties['tx_lon']
+    rx_lat = properties['rx_lat']
+    rx_lon = properties['rx_lon']
 
     MONTH = current_datetime.strftime("%Y %m.00")  # .00 is needed for VOACAP config
     SSN = next((item['ssn'] for item in SSN_DATA if item['time-tag'] == current_datetime.strftime("%Y-%m")))
@@ -43,16 +62,35 @@ def one_month(circuit, current_datetime):
     RX = circuit["rx"]
     CIRCUIT = f"{abs(tx_lat):05.2f}{'N' if tx_lat >= 0 else 'S'}   {abs(tx_lon):06.2f}{'E' if tx_lon >= 0 else 'W'}    {abs(rx_lat):05.2f}{'N' if rx_lat >= 0 else 'S'}   {abs(rx_lon):06.2f}{'E' if rx_lon >= 0 else 'W'}"
     NOISE = circuit['noise']
-    POWER = f"{info['power'] * 0.0008:.4f}"  # divide by 1000 and 80% efficiency, VOACAP online does that
+    POWER = f"{properties['power'] * 0.0008:.4f}"  # divide by 1000 and 80% efficiency, VOACAP online does that
 
-    local_tz = TimezoneFinder().timezone_at(lat=rx_lat, lng=rx_lon)
     run_voacap(MONTH, SSN, TX, RX, CIRCUIT, NOISE, POWER)
-    wsprlive_pull_one_month(TX, RX, MONTH, current_datetime, local_tz)
 
+    # Point to Point
+    local_tz = TimezoneFinder().timezone_at(lat=rx_lat, lng=rx_lon)
+    wsprlive_pull_one_month(TX, RX, MONTH, current_datetime, local_tz, DATA_POINT_PATH)
+
+    # Point to Group
+    r = ALPHA * math.sqrt(properties["distance"])
+    r_lat = _r_lat(r)
+    r_long = _r_lon(r, rx_lat)
+
+    path = DATA_GROUP_PATH / f"{TX}_{RX}"
+    group = wsprlive_get_info_group(circuit, current_datetime, rx_lat, rx_lon, r_lat, r_long)
+    tasks = []
+    for point in group:
+        local_tz = TimezoneFinder().timezone_at(lat=point["rx_lat"], lng=point["rx_lon"])
+        tasks.append(wsprlive_pull_one_month_async(TX, point["rx_sign"], MONTH, current_datetime, local_tz, path))
+
+    async def pull_group():
+        await asyncio.gather(*tasks)
+
+    asyncio.run(pull_group())
+    print(" Group pull done!\n")
 
 def prep_data():
-    data_path = Path("data/data")
-    if os.path.exists(data_path): shutil.rmtree(data_path)
+    if os.path.exists(DATA_POINT_PATH): shutil.rmtree(DATA_POINT_PATH)
+    if os.path.exists(DATA_GROUP_PATH): shutil.rmtree(DATA_GROUP_PATH)
 
     for circuit in CONFIG["circuits"]:
         circuit["noise"] = CONFIG["noise_levels"].get(circuit["noise"])  # Translate noise
@@ -64,10 +102,9 @@ def prep_data():
 
 
 def plot():
-    data_path = Path("data/figures")
-    if os.path.exists(data_path): shutil.rmtree(data_path)
+    if os.path.exists(FIGURE_POINT_PATH): shutil.rmtree(FIGURE_POINT_PATH)
 
-    dirs = sorted([p for p in Path("data/data").glob("*/*") if p.is_dir()])
+    dirs = sorted([p for p in DATA_POINT_PATH.glob("*/*") if p.is_dir()])
     for path in dirs:
         voacapx = path / "voacapx.out"
         print(f"\n Going through: {path}")
@@ -85,6 +122,7 @@ def main():
     prep_data()
     plot()
     make_latex()
+
     print("\n Done!")
 
 
