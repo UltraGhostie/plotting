@@ -1,8 +1,7 @@
-import asyncio
 import json
+import math
 import os.path
 import shutil
-import math
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -11,11 +10,10 @@ from dateutil.relativedelta import relativedelta
 from timezonefinder import TimezoneFinder
 
 from tools.latex import make_latex
-from tools.plots import make_plots
+from tools.plots import make_plots, CAPTIONS
 from tools.voacap import run_voacap
 from tools.voacap_extractor import extract, get_band
-from tools.wspr import wsprlive_get_info, wsprlive_pull_one_month, wsprlive_get_info_group, \
-    wsprlive_pull_one_month_async
+from tools.wspr import wsprlive_get_info, wsprlive_pull_one_month, wsprlive_get_info_group
 
 global FROM_DATE, TO_DATE, CONFIG, SSN_DATA
 
@@ -27,6 +25,7 @@ DATA_POINT_PATH: Path = Path("data/data/point")
 FIGURE_POINT_PATH: Path = Path("data/figures/point")
 
 DATA_GROUP_PATH: Path = Path("data/data/group")
+
 
 def _r_lat(r: float):
     return (r * 360) / EARTH_LAT
@@ -65,10 +64,12 @@ def one_month(circuit, current_datetime):
     POWER = f"{properties['power'] * 0.0008:.4f}"  # divide by 1000 and 80% efficiency, VOACAP online does that
 
     run_voacap(MONTH, SSN, TX, RX, CIRCUIT, NOISE, POWER)
+    print()
 
     # Point to Point
-    local_tz = TimezoneFinder().timezone_at(lat=rx_lat, lng=rx_lon)
+    local_tz = ZoneInfo(TimezoneFinder().timezone_at(lat=rx_lat, lng=rx_lon))
     wsprlive_pull_one_month(TX, RX, MONTH, current_datetime, local_tz, DATA_POINT_PATH)
+    print(" Point pull done!\n")
 
     # Point to Group
     r = ALPHA * math.sqrt(properties["distance"])
@@ -77,16 +78,12 @@ def one_month(circuit, current_datetime):
 
     path = DATA_GROUP_PATH / f"{TX}_{RX}"
     group = wsprlive_get_info_group(circuit, current_datetime, rx_lat, rx_lon, r_lat, r_long)
-    tasks = []
     for point in group:
-        local_tz = TimezoneFinder().timezone_at(lat=point["rx_lat"], lng=point["rx_lon"])
-        tasks.append(wsprlive_pull_one_month_async(TX, point["rx_sign"], MONTH, current_datetime, local_tz, path))
+        local_tz = ZoneInfo(TimezoneFinder().timezone_at(lat=point["rx_lat"], lng=point["rx_lon"]))
+        wsprlive_pull_one_month(TX, point["rx_sign"], MONTH, current_datetime, local_tz, path)
 
-    async def pull_group():
-        await asyncio.gather(*tasks)
-
-    asyncio.run(pull_group())
     print(" Group pull done!\n")
+
 
 def prep_data():
     if os.path.exists(DATA_POINT_PATH): shutil.rmtree(DATA_POINT_PATH)
@@ -115,12 +112,13 @@ def plot():
             snrlw = [d["value"] for d in extract("SNR LW", voacapx, band=band)]
 
             make_plots(path, band, snr, snrup, snrlw)
-
+    with open(Path("data/captions.json"), "w") as file:
+        json.dump(CAPTIONS, file)
 
 def main():
-    read_config()
-    prep_data()
-    plot()
+    #read_config()
+    #prep_data()
+    #plot()
     make_latex()
 
     print("\n Done!")

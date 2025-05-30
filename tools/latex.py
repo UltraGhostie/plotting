@@ -1,9 +1,10 @@
+import json
 from datetime import datetime
 from pathlib import Path
 from itertools import zip_longest
-from tools.plots import CAPTIONS
 
 FIGURE_POINT_PATH: Path = Path("data/figures/point")
+CAPTIONS = {}
 
 def write_section(tx: str, rx: str, f):
     f.write(f"\\section*{{\\textbf{{TX}}:{tx} \\quad | \\quad \\textbf{{RX}}:{rx}}}\n")
@@ -30,8 +31,10 @@ def write_figure_block(path: Path, f):
 
 
 def make_latex():
+    global CAPTIONS
     output_path = Path("data/import_figures.tex")
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    CAPTIONS = json.load(open(Path("data/captions.json")))
 
     fig_count = 1
     with open(output_path, "w") as f:

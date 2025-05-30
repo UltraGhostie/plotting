@@ -114,7 +114,7 @@ def plot_errors_bars():
     )
 
     path = PATH / "error_bars.pdf"
-    CAPTIONS[path] = latex_caption
+    CAPTIONS[str(path)] = latex_caption
 
     fig.savefig(path)
     plt.close(fig)
@@ -156,7 +156,7 @@ def plot_req_snr():
     )
 
     path = PATH / f"low_req_snr.pdf"
-    CAPTIONS[path] = latex_caption
+    CAPTIONS[str(path)] = latex_caption
 
     fig.savefig(path)
     plt.close(fig)
@@ -227,16 +227,19 @@ def plot_hour_normal_distros():
         )
 
         path = PATH / f"normal_h{H:02d}.pdf"
-        CAPTIONS[path] = latex_caption
+        CAPTIONS[str(path)] = latex_caption
 
         fig.savefig(path)
         plt.close(fig)
 
 
 def make_plots(path: Path, band: int, snr: list[float], snr_up: list[float], snr_lw: list[float]):
-    global DATA, CAPTIONS, SNR_V, o_UP_V, o_LW_V, SNR_W, o_UP_W, o_LW_W, DISTRO_W, dSNR, dUP, dLW, PATH, REQ_SNR
+    global DATA, SNR_V, o_UP_V, o_LW_V, SNR_W, o_UP_W, o_LW_W, DISTRO_W, dSNR, dUP, dLW, PATH, REQ_SNR
 
-    DATA = json.load(open(path / f"{band}.json"))
+    file_path = path / f"{band}.json"
+    if not file_path.exists() or file_path.stat().st_size == 0: return
+
+    DATA = json.load(open(file_path))
     if not DATA: return
 
     PATH = FIGURE_POINT_PATH / path.relative_to(path.parent.parent) / str(band)
