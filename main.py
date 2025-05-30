@@ -116,9 +116,9 @@ def plot():
         json.dump(CAPTIONS, file)
 
 def main():
-    #read_config()
-    #prep_data()
-    #plot()
+    read_config()
+    prep_data()
+    plot()
     make_latex()
 
     print("\n Done!")

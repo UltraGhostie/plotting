@@ -24,7 +24,7 @@ def write_figure_block(path: Path, f):
         "                \\begin{minipage}{0.497\\textwidth}\n"
         "                    \\centering\n"
         f"                    \\includegraphics[width=\\textwidth]{{{path}}}\n"
-        f"                        \\caption{{{CAPTIONS.get(path, "Caption Lost")}}}\n"
+        f"                        \\caption{{{CAPTIONS.get(str(path), "Caption Lost")}}}\n"
         f"                        \\label{{fig:{str(path).replace("data/figure/", "").replace('/', '-')}}}\n"
         "                \\end{minipage}\n"
     )
@@ -67,4 +67,3 @@ def make_latex():
                         f.write("\t\t\t\\end{figure}\n")
                         if fig_count % 2 == 0: f.write("\\clearpage")
                         fig_count += 1
-    CAPTIONS.clear()
