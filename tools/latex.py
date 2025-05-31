@@ -30,7 +30,7 @@ def write_figure_block(path: Path, f):
     )
 
 
-def make_latex():
+def gen_latex():
     global CAPTIONS
     output_path = Path("data/import_figures.tex")
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -48,10 +48,7 @@ def make_latex():
             for month_path in month_dirs:
                 month = datetime.strptime(month_path.name, "%Y_%m.00").strftime("%B %Y")
                 write_subsection(month, f)
-                band_dirs = sorted(
-                    (p for p in month_path.glob("*") if p.name.isdigit()),
-                    key=lambda p: int(p.name)
-                )
+                band_dirs = sorted([p for p in month_path.glob("*") if p.is_dir()])
 
                 for band_path in band_dirs:
                     write_subsubsection(band_path.name, f)

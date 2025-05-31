@@ -9,10 +9,10 @@ from zoneinfo import ZoneInfo
 from dateutil.relativedelta import relativedelta
 from timezonefinder import TimezoneFinder
 
-from tools.latex import make_latex
-from tools.plots import make_plots, CAPTIONS
+from tools.latex import gen_latex
+from tools.plots import make_point_plots, CAPTIONS, make_group_plots
 from tools.voacap import run_voacap
-from tools.voacap_extractor import extract, get_band
+from tools.voacap_extractor import extract
 from tools.wspr import wsprlive_get_info, wsprlive_pull_one_month, wsprlive_get_info_group
 
 global FROM_DATE, TO_DATE, CONFIG, SSN_DATA
@@ -25,6 +25,7 @@ DATA_POINT_PATH: Path = Path("data/data/point")
 FIGURE_POINT_PATH: Path = Path("data/figures/point")
 
 DATA_GROUP_PATH: Path = Path("data/data/group")
+FIGURE_GROUP_PATH: Path = Path("data/figures/group")
 
 
 def _r_lat(r: float):
@@ -32,7 +33,7 @@ def _r_lat(r: float):
 
 
 def _r_lon(r: float, rx_lat: float):
-    return (r * 360) / (EARTH_LON * math.cos((rx_lat * math.pi) / 180))
+    return (r * 360) / (EARTH_LON * math.cos(math.radians(rx_lat)))
 
 
 def read_config():
@@ -66,9 +67,13 @@ def one_month(circuit, current_datetime):
     run_voacap(MONTH, SSN, TX, RX, CIRCUIT, NOISE, POWER)
     print()
 
+    sub_path = f"{TX.replace("/", "∕")}_{RX.replace("/", "∕")}/{MONTH.replace(" ", "_")}"
+
     # Point to Point
+    prefix_path = DATA_POINT_PATH / sub_path
     local_tz = ZoneInfo(TimezoneFinder().timezone_at(lat=rx_lat, lng=rx_lon))
-    wsprlive_pull_one_month(TX, RX, MONTH, current_datetime, local_tz, DATA_POINT_PATH)
+    wsprlive_pull_one_month(TX, RX, current_datetime, local_tz, prefix_path)
+
     print(" Point pull done!\n")
 
     # Point to Group
@@ -76,11 +81,12 @@ def one_month(circuit, current_datetime):
     r_lat = _r_lat(r)
     r_long = _r_lon(r, rx_lat)
 
-    path = DATA_GROUP_PATH / f"{TX}_{RX}"
+    prefix_path = DATA_GROUP_PATH / sub_path
     group = wsprlive_get_info_group(circuit, current_datetime, rx_lat, rx_lon, r_lat, r_long)
     for point in group:
+        suffix_path = f"/{TX.replace("/", "∕")}_{point["rx_sign"].replace("/", "∕")}"
         local_tz = ZoneInfo(TimezoneFinder().timezone_at(lat=point["rx_lat"], lng=point["rx_lon"]))
-        wsprlive_pull_one_month(TX, point["rx_sign"], MONTH, current_datetime, local_tz, path)
+        wsprlive_pull_one_month(TX, point["rx_sign"], current_datetime, local_tz, prefix_path, suffix_path)
 
     print(" Group pull done!\n")
 
@@ -98,30 +104,52 @@ def prep_data():
             current_datetime += relativedelta(months=1)
 
 
-def plot():
+def plot_point():
     if os.path.exists(FIGURE_POINT_PATH): shutil.rmtree(FIGURE_POINT_PATH)
 
+    print("\n Plotting for point...")
     dirs = sorted([p for p in DATA_POINT_PATH.glob("*/*") if p.is_dir()])
     for path in dirs:
         voacapx = path / "voacapx.out"
-        print(f"\n Going through: {path}")
-        for band in get_band(voacapx):
+        print(f" Going through: {path}")
+
+        bands = sorted(path.glob("*.json"))
+        for band_path in bands:
+            band = int(band_path.stem)
             print(f"\tPlotting for band: {band}")
+
             snr = [d["value"] for d in extract("SNR", voacapx, band=band)]
             snrup = [d["value"] for d in extract("SNR UP", voacapx, band=band)]
             snrlw = [d["value"] for d in extract("SNR LW", voacapx, band=band)]
 
-            make_plots(path, band, snr, snrup, snrlw)
+            make_point_plots(path, f"{band:02d}", snr, snrup, snrlw)
+        print()
     with open(Path("data/captions.json"), "w") as file:
         json.dump(CAPTIONS, file)
+
+def plot_group():
+    if os.path.exists(FIGURE_GROUP_PATH): shutil.rmtree(FIGURE_GROUP_PATH)
+
+    print("\n Plotting for group...")
+    dirs = sorted([p for p in DATA_GROUP_PATH.glob("*/*") if p.is_dir()])
+    for path in dirs:
+        print(f" Going through: {path}")
+        bands = sorted(path.glob("*"))
+        for band_path in bands:
+            print(f"\tPlotting for band: {int(band_path.name)}")
+            make_group_plots(path, band_path.name)
+        print()
+    #with open(Path("data/captions.json"), "w") as file:
+    #    json.dump(CAPTIONS, file)
 
 def main():
     read_config()
     prep_data()
-    plot()
-    make_latex()
+    plot_point()
+    #plot_group()
+    gen_latex()
 
-    print("\n Done!")
+    print(" Done!")
 
 
 if __name__ == "__main__":

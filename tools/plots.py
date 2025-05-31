@@ -20,76 +20,63 @@ plt.rcParams.update({
 SNR_OFFSET = 34  # SNR offset to compensate for bandwidth differences between VOACAP and WSPR
 HOURS = range(24)
 
-DATA = {}
-PATH = Path()
 FIGURE_POINT_PATH: Path = Path("data/figures/point")
-
-SNR_V = []
-o_UP_V = []
-o_LW_V = []
-
-SNR_W: list[float] = []
-o_UP_W: list[float] = []
-o_LW_W: list[float] = []
-
-DISTRO_W: list[tuple[int, list]] = []
-
-dSNR: list[float] = []
-dUP: list[float] = []
-dLW: list[float] = []
-
-REQ_SNR: list[float] = []
-
+FIGURE_GROUP_PATH: Path = Path("data/figures/group")
 CAPTIONS = {}
 
 
-def prep_data():
-    global DATA, SNR_W, o_UP_W, o_LW_W, DISTRO_W, dSNR, dUP, dLW, REQ_SNR, SNR_OFFSET
+def get_per_hour_distros(path: Path):
+    data = json.load(open(path))
+
+    normal: list[dict[str, float]] = []
+    distro: list[dict[str, list[float] | int]] = []
+    req_snr: list[float] = []
 
     for H in HOURS:
         snr_hour = sorted([
             entry["snr"]
             for entry
-            in DATA
+            in data
             if datetime.strptime(entry["time"], "%Y-%m-%d %H:%M:%S").hour == H
         ])
+        size = len(snr_hour)
 
-        if len(snr_hour) >= 1:
-            DISTRO_W.append((len(snr_hour), list(Counter(snr_hour).items())))
-
+        if size >= 1:
             median = float(np.percentile(snr_hour, 50))
-            SNR_W.append(median)
-            o_UP_W.append(abs(median - float(np.percentile(snr_hour, 90))) / 1.28)
-            o_LW_W.append(abs(median - float(np.percentile(snr_hour, 10))) / 1.28)
-            REQ_SNR.append(float(np.percentile(snr_hour, 1)) + SNR_OFFSET)
+            p90 = abs(median - float(np.percentile(snr_hour, 90))) / 1.28
+            p10 = abs(median - float(np.percentile(snr_hour, 10))) / 1.28
+            normal.append({"snr": median, "up": p90, "lw": p10})
 
-            dSNR.append(SNR_W[H] - SNR_V[H])
-            dUP.append(o_UP_W[H] - o_UP_V[H])
-            dLW.append(o_LW_W[H] - o_LW_V[H])
+            snr, count = zip(*Counter(snr_hour).items())
+            distro.append({"snr": list(snr), "p": [c / size for c in count], "size": size})
+
+            req_snr.append(float(np.percentile(snr_hour, 1)) + SNR_OFFSET)
         else:
-            DISTRO_W.append((0, []))
+            normal.append({"snr": np.nan, "up": np.nan, "lw": np.nan})
+            distro.append({"snr": [], "p": []})
+            req_snr.append(np.nan)
 
-            SNR_W.append(np.nan)
-            o_UP_W.append(np.nan)
-            o_LW_W.append(np.nan)
-            REQ_SNR.append(np.nan)
-
-            dSNR.append(np.nan)
-            dUP.append(np.nan)
-            dLW.append(np.nan)
+    return normal, distro, req_snr
 
 
-def plot_errors_bars():
-    global HOURS, dSNR, dUP, dLW
+def get_difference_nomral(base: list, comparison: list):
+    return [{
+        "snr": b["snr"] - c["snr"],
+        "up": b["up"] - c["up"],
+        "lw": b["lw"] - c["lw"]
+    } for b, c in zip(base, comparison)]
 
+
+def plot_errors_bars(dnorm: list, path: Path):
+    dsnr, dup, dlw = zip(*[(d["snr"], d["up"], d["lw"]) for d in dnorm])
     fig, ax = plt.subplots(constrained_layout=True)  # figsize=(12, 4)
 
     bar_width = 0.6 / 3
     x = np.arange(len(HOURS))
 
-    ax.bar(x - bar_width, dSNR, color="#0052CC", lw=1, label=r"$\Delta\mathrm{SNR}$", width=bar_width)
-    ax.bar(x, dUP, color="#CC0000", lw=1, label=r"$\Delta \sigma_\mathrm{UP}$", width=bar_width)
-    ax.bar(x + bar_width, dLW, color="#2CA02C", lw=1, label=r"$\Delta \sigma_\mathrm{LW}$", width=bar_width)
+    ax.bar(x - bar_width, dsnr, color="#0052CC", lw=1, label=r"$\Delta\mathrm{SNR}$", width=bar_width)
+    ax.bar(x, dup, color="#CC0000", lw=1, label=r"$\Delta \sigma_\mathrm{UP}$", width=bar_width)
+    ax.bar(x + bar_width, dlw, color="#2CA02C", lw=1, label=r"$\Delta \sigma_\mathrm{LW}$", width=bar_width)
 
     ax.set_title("Hourly VOACAP Parameter Deviations from WSPR")
     ax.set_ylabel("Deviation (dB·Hz)")
@@ -103,9 +90,9 @@ def plot_errors_bars():
     ax.grid(True, which='major', alpha=0.5)
     ax.grid(True, which='minor', alpha=0.3)
 
-    avg_dsnr = np.nanmean(np.abs(np.array(dSNR)))
-    avg_dup = np.nanmean(np.abs(np.array(dUP)))
-    avg_dlw = np.nanmean(np.abs(np.array(dLW)))
+    avg_dsnr = np.nanmean(np.abs(np.array(dsnr)))
+    avg_dup = np.nanmean(np.abs(np.array(dup)))
+    avg_dlw = np.nanmean(np.abs(np.array(dlw)))
     latex_caption = (
         rf"Average deviations:"
         rf"\\$\overline{{\Delta \mathrm{{SNR}}}} = {avg_dsnr:.2f}\,\mathrm{{dB\cdot Hz}}$"
@@ -113,17 +100,15 @@ def plot_errors_bars():
         rf"\\$\overline{{\Delta \sigma_\mathrm{{LW}}}} = {avg_dlw:.2f}\,\mathrm{{dB\cdot Hz}}$"
     )
 
-    path = PATH / "error_bars.pdf"
+    path = path / "error_bars.pdf"
     CAPTIONS[str(path)] = latex_caption
 
     fig.savefig(path)
     plt.close(fig)
 
 
-def plot_req_snr():
-    global REQ_SNR
-
-    data = np.array(REQ_SNR)
+def plot_req_snr(req_snr: list, path: Path):
+    data = np.array(req_snr)
     data = data[~np.isnan(data)]
 
     mu, o = norm.fit(data)
@@ -155,34 +140,40 @@ def plot_req_snr():
         rf"\\Fitted Normal: $\mu = {mu:.2f}$ dB$\cdot$Hz,\quad $\sigma = {o:.2f}$ dB$\cdot$Hz"
     )
 
-    path = PATH / f"low_req_snr.pdf"
+    path = path / f"low_req_snr.pdf"
     CAPTIONS[str(path)] = latex_caption
 
     fig.savefig(path)
     plt.close(fig)
 
 
-def plot_hour_normal_distros():
-    global SNR_W, o_UP_W, o_LW_W, SNR_V, o_UP_V, o_LW_V
-
+def plot_hour_normal_distros(wspr_norm: list, voacap_norm: list, wspr_distro: list, path: Path):
     for H in HOURS:
-        sample_size, hour_distro = DISTRO_W[H]
-        if not hour_distro: continue
+        hour_distro = wspr_distro[H]
+        if not hour_distro["snr"]: continue
 
         # Parameters for two split normal distributions
         EPS = 1e-16  # Dodge sigma = 0
-        mu1, o_l1, o_u1 = SNR_W[H], max(o_LW_W[H], EPS), max(o_UP_W[H], EPS)
-        mu2, o_l2, o_u2 = SNR_V[H], max(o_LW_V[H], EPS), max(o_UP_V[H], EPS)
+
+        wspr = wspr_norm[H]
+        mu1 = wspr["snr"]
+        o_l1 = max(wspr["lw"], EPS)
+        o_u1 = max(wspr["up"], EPS)
+
+        voacap = voacap_norm[H]
+        mu2 = voacap["snr"]
+        o_l2 = max(voacap["lw"], EPS)
+        o_u2 = max(voacap["up"], EPS)
+
         A1, A2 = np.sqrt(2 / np.pi) / (o_l1 + o_u1), np.sqrt(2 / np.pi) / (o_l2 + o_u2)
 
         # Generate x values over a range covering both distributions
         o_off = 4
         x = np.linspace(
-            min(hour_distro[0][0], mu1 - o_off * o_u1, mu2 - o_off * o_u2),
-            max(hour_distro[-1][0], mu1 + o_off * o_u1, mu2 + o_off * o_u2), 300)
-
-        snr, count = zip(*hour_distro)
-        prob = [c / sample_size for c in count]
+            min(hour_distro["snr"][0], mu1 - o_off * o_u1, mu2 - o_off * o_u2),
+            max(hour_distro["snr"][-1], mu1 + o_off * o_u1, mu2 + o_off * o_u2),
+            300
+        )
 
         # Compute piecewise PDFs
         pdf1 = np.where(
@@ -199,8 +190,8 @@ def plot_hour_normal_distros():
         # Plot both on the same axes
         fig, ax = plt.subplots(constrained_layout=True)  # figsize=(10, 10),
 
-        label1, = ax.plot(snr, prob, lw=1, color="#0052CC", label="WSPR Observed")
-        ax.fill_between(snr, 0, prob, alpha=0.2)
+        label1, = ax.plot(hour_distro["snr"], hour_distro["p"], lw=1, color="#0052CC", label="WSPR Observed")
+        ax.fill_between(hour_distro["snr"], 0, hour_distro["p"], alpha=0.2)
         label2, = ax.plot(x, pdf1, lw=1, color="#CC0000", label="WSPR Fitted")
         ax.fill_between(x, 0, pdf1, alpha=0.2)
         label3, = ax.plot(x, pdf2, lw=1, color="#2CA02C", label="VOACAP Prediction")
@@ -221,46 +212,40 @@ def plot_hour_normal_distros():
         ax.grid(True, which='minor', alpha=0.3)
 
         latex_caption = (
-            rf"\\WSPR sample size: $n = {sample_size}$"
+            rf"\\WSPR sample size: $n = {hour_distro["size"]}$"
             rf"\\WSPR: $\mu = {int(mu1)}$,\quad $\sigma_{{\mathrm{{UP}}}} = {o_u1:.2f}$,\quad $\sigma_{{\mathrm{{LW}}}} = {o_l1:.2f}$"
             rf"\\VOACAP: $\mu = {int(mu2)}$,\quad $\sigma_{{\mathrm{{UP}}}} = {o_u2:.2f}$,\quad $\sigma_{{\mathrm{{LW}}}} = {o_l2:.2f}$"
         )
 
-        path = PATH / f"normal_h{H:02d}.pdf"
-        CAPTIONS[str(path)] = latex_caption
+        file_path = path / f"normal_h{H:02d}.pdf"
+        CAPTIONS[str(file_path)] = latex_caption
 
-        fig.savefig(path)
+        fig.savefig(file_path)
         plt.close(fig)
 
 
-def make_plots(path: Path, band: int, snr: list[float], snr_up: list[float], snr_lw: list[float]):
-    global DATA, SNR_V, o_UP_V, o_LW_V, SNR_W, o_UP_W, o_LW_W, DISTRO_W, dSNR, dUP, dLW, PATH, REQ_SNR
+def make_point_plots(path: Path, band: str, snr: list[float], snr_up: list[float], snr_lw: list[float]):
+    dir_path = FIGURE_POINT_PATH / path.relative_to(path.parent.parent) / band
+    dir_path.mkdir(parents=True, exist_ok=True)
 
-    file_path = path / f"{band}.json"
-    if not file_path.exists() or file_path.stat().st_size == 0: return
+    voacap_norm = [{
+        "snr": s - SNR_OFFSET,
+        "up": abs(up / 1.28),
+        "lw": abs(lw / 1.28)
+    } for s, up, lw in zip(snr, snr_up, snr_lw)]
 
-    DATA = json.load(open(file_path))
-    if not DATA: return
+    wspr_norm, wspr_distro, wspr_req_snr = get_per_hour_distros(path / f"{band}.json")
+    dnorm = get_difference_nomral(wspr_norm, voacap_norm)
 
-    PATH = FIGURE_POINT_PATH / path.relative_to(path.parent.parent) / str(band)
-    PATH.mkdir(parents=True, exist_ok=True)
+    plot_errors_bars(dnorm, dir_path)
+    plot_req_snr(wspr_req_snr, dir_path)
+    plot_hour_normal_distros(wspr_norm, voacap_norm, wspr_distro, dir_path)
 
-    SNR_V = [s - SNR_OFFSET for s in snr]
-    o_UP_V = [abs(up / 1.28) for up in snr_up]
-    o_LW_V = [abs(lw / 1.28) for lw in snr_lw]
 
-    SNR_W.clear()
-    o_UP_W.clear()
-    o_LW_W.clear()
+def make_group_plots(path: Path, band: str):
+    group = []
 
-    DISTRO_W.clear()
-
-    dSNR.clear()
-    dUP.clear()
-    dLW.clear()
-    REQ_SNR.clear()
-
-    prep_data()
-    plot_errors_bars()
-    plot_req_snr()
-    plot_hour_normal_distros()
+    jsons = sorted(path.glob(f"{band}/*.json"))
+    for file_path in jsons:
+        group.append({file_path.stem: get_per_hour_distros(file_path)})
+    print("fml")

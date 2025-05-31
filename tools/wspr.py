@@ -7,7 +7,7 @@ import httpx
 from dateutil.relativedelta import relativedelta
 
 
-#BANDS = ["0", "1", "3", "5", "7", "10", "14", "18", "21", "24", "28", "50", "70", "144", "432", "1296", "-1"]
+# BANDS = ["0", "1", "3", "5", "7", "10", "14", "18", "21", "24", "28", "50", "70", "144", "432", "1296", "-1"]
 
 
 def wsprlive_get(query, client=httpx.Client(http2=True, timeout=None)):
@@ -21,7 +21,6 @@ def wsprlive_get(query, client=httpx.Client(http2=True, timeout=None)):
     if "exception" in json_obj: print(f" \033[91m{json_obj["exception"]}\033[0m")
 
     return json_obj["data"]
-
 
 
 def wsprlive_get_info(circuit, current_datetime):
@@ -50,10 +49,8 @@ def wsprlive_get_info_group(circuit, current_datetime, c_lat: float, c_lon: floa
         f"AND '{start}' <= time AND time < '{end}'")
 
 
-def wsprlive_pull_one_month(tx, rx, month, current_datetime, local_tz, path):
+def wsprlive_pull_one_month(tx, rx, current_datetime, local_tz, prefix_path, suffix_path: str = ""):
     print(f" Pulling: {tx} - {rx}")
-    path = path / f"{tx.replace("/", "%")}_{rx.replace("/", "%")}" / f"{month.replace(" ", "_")}"
-    path.mkdir(parents=True, exist_ok=True)
 
     local_datetime = current_datetime.astimezone(local_tz)
     start = local_datetime.strftime("%Y-%m-%d %H:%M:%S")
@@ -77,5 +74,7 @@ def wsprlive_pull_one_month(tx, rx, month, current_datetime, local_tz, path):
         )
 
     for band, group in groupby(json_obj, lambda e: e["band"]):
-        with open(path / f"{band}.json", "w") as file:
+        full_path = prefix_path / f"{band:02d}{suffix_path}.json"
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(full_path, "w") as file:
             json.dump(list(group), file)
