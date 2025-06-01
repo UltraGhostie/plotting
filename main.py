@@ -168,8 +168,8 @@ def plot_group():
             print(f"\tPlotting for band: {int(band_path.name)}")
             make_group_plots(path, band_path.name, beacon_dist)
         print()
-    # with open(Path("data/captions.json"), "w") as file:
-    #    json.dump(CAPTIONS, file)
+    with open(Path("data/captions.json"), "w") as file:
+        json.dump(CAPTIONS, file)
 
 
 def main():
@@ -177,7 +177,7 @@ def main():
     #prep_data()
     #plot_point()
     plot_group()
-    #gen_latex()
+    gen_latex()
 
     print(" Done!")
 

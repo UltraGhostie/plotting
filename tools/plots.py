@@ -262,12 +262,19 @@ def plot_group_errors_bars(dicts: list, band, center, path: Path):
 
     fig, ax = plt.subplots(constrained_layout=True)
 
+    count = 0
     for i, (label, x, snr, up, lw) in enumerate(zip(rx, dist, avg_dsnr, avg_dup, avg_dlw)):
+        if snr == np.nan or up == np.nan or lw == np.nan: continue
         ax.errorbar(x, snr, yerr=[[lw], [up]], fmt='o', capsize=4, label=label.replace("∕", "/"))
+        count += 1
+
+    if count == 0:
+        plt.close(fig)
+        return
 
     ax.set_xlabel(rf"$\Delta\mathrm{{Distance}}$ from {center.replace("∕", "/")}")
     ax.set_ylabel(rf"$\overline{{|\Delta\mathrm{{SNR}}|}}$")
-    ax.set_title(f"Average Deviations from {center} (Band: {band})")
+    ax.set_title(f"Average Deviations from {center.replace("∕", "/")} (Band: {band})")
     ax.margins(x=0.1, y=0.1)
 
     ax.minorticks_on()
@@ -282,7 +289,9 @@ def plot_group_errors_bars(dicts: list, band, center, path: Path):
               bbox_to_anchor=(1.01, 1),
               loc='upper left')
 
-    latex_caption = "fuck"
+    latex_caption = "\\\\" + ", ".join(
+        rf"{beacon}: sample size $= {n}$" for beacon, n in zip(rx, size)
+    )
 
     file_path = path / f"error_{band}.pdf"
     CAPTIONS[str(file_path)] = latex_caption
@@ -295,17 +304,28 @@ def make_group_plots(path: Path, band: str, beacon_dist):
     global WSPR_NORM
 
     WSPR_NORM = json.load(open("data/wspr_norm.json"))
+
     RX = path.parent.name.split("_")[1]
     dir_path = FIGURE_GROUP_PATH / path.relative_to(path.parent.parent)
     dir_path.mkdir(parents=True, exist_ok=True)
 
     jsons = sorted(path.glob(f"{band}/*.json"))
     group = {file_path.stem.split("_")[1]: get_per_hour_distros(file_path)[0] for file_path in jsons}
-    # print(jsons)
-    dicts = [{
-        "rx": rx,
-        "dist": beacon_dist[f"{RX}_{rx}"],
-        "dnorm": get_difference_nomral(WSPR_NORM[path.parent.name][band], group[rx])
-    } for rx in group]
+    dicts = []
+    for rx in group:
+        if path.parent.name not in WSPR_NORM or band not in WSPR_NORM[path.parent.name]:
+            continue
 
-    plot_group_errors_bars(dicts, band, RX, dir_path)
+        dnorm = get_difference_nomral(WSPR_NORM[path.parent.name][band], group[rx])
+
+        if all(all(np.isnan(v) for v in d.values()) for d in dnorm):
+            continue
+
+        dicts.append({
+            "rx": rx,
+            "dist": beacon_dist[f"{RX}_{rx}"],
+            "dnorm": dnorm
+        })
+
+    if len(dicts) != 0:
+        plot_group_errors_bars(dicts, band, RX, dir_path)
