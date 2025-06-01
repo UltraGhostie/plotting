@@ -173,11 +173,11 @@ def plot_group():
 
 
 def main():
-    read_config()
-    prep_data()
-    plot_point()
+    #read_config()
+    #prep_data()
+    #plot_point()
     plot_group()
-    gen_latex()
+    #gen_latex()
 
     print(" Done!")
 

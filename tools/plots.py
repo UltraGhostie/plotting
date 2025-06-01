@@ -247,11 +247,13 @@ def make_point_plots(path: Path, band: str, snr: list[float], snr_up: list[float
     plot_hour_normal_distros(wspr_norm, voacap_norm, wspr_distro, dir_path)
 
 
-def plot_group_errors_bars(dicts: list, path: Path):
+def plot_group_errors_bars(dicts: list, band, center, path: Path):
     rx, dist, dnorm = zip(*[(d["rx"], d["dist"], d["dnorm"]) for d in dicts])
     avg_dsnr, avg_dup, avg_dlw = [], [], []
+    size = []
 
     for dn in dnorm:
+        size.append(len(dn))
         snr, up, lw = zip(*[(d["snr"], d["up"], d["lw"]) for d in dn])
 
         avg_dsnr.append(np.nanmean(np.abs(np.array(snr))))
@@ -260,29 +262,32 @@ def plot_group_errors_bars(dicts: list, path: Path):
 
     fig, ax = plt.subplots(constrained_layout=True)
 
-    bar_width = 1.6 / 3
-    x = np.array(dist) #np.linspace(0, max(dist), len(dnorm))
+    for i, (label, x, snr, up, lw) in enumerate(zip(rx, dist, avg_dsnr, avg_dup, avg_dlw)):
+        ax.errorbar(x, snr, yerr=[[lw], [up]], fmt='o', capsize=4, label=label.replace("∕", "/"))
 
-    ax.bar(x - bar_width, avg_dsnr, color="#0052CC", lw=1, label=r"$\Delta\mathrm{SNR}$", width=bar_width)
-    ax.bar(x, avg_dup, color="#CC0000", lw=1, label=r"$\Delta \sigma_\mathrm{UP}$", width=bar_width)
-    ax.bar(x + bar_width, avg_dlw, color="#2CA02C", lw=1, label=r"$\Delta \sigma_\mathrm{LW}$", width=bar_width)
+    ax.set_xlabel(rf"$\Delta\mathrm{{Distance}}$ from {center.replace("∕", "/")}")
+    ax.set_ylabel(rf"$\overline{{|\Delta\mathrm{{SNR}}|}}$")
+    ax.set_title(f"Average Deviations from {center} (Band: {band})")
+    ax.margins(x=0.1, y=0.1)
 
-    ax.set_title("TEMP")
-    ax.set_ylabel("Deviation (dB·Hz)")
-    ax.set_xlabel("Distance (km)")
-
-    ax.set_xticks(x)
-    ax.margins(x=0.01, y=0.01)
-
-    ax.legend()
     ax.minorticks_on()
     ax.grid(True, which='major', alpha=0.5)
     ax.grid(True, which='minor', alpha=0.3)
 
-    path = path / "error_bars.pdf"
-    #CAPTIONS[str(path)] = latex_caption
+    ax.legend(ncol=1,
+              fontsize='x-small',
+              handlelength=0,
+              handletextpad=0.5,
+              borderaxespad=0,
+              bbox_to_anchor=(1.01, 1),
+              loc='upper left')
 
-    fig.savefig(path)
+    latex_caption = "fuck"
+
+    file_path = path / f"error_{band}.pdf"
+    CAPTIONS[str(file_path)] = latex_caption
+
+    fig.savefig(file_path)
     plt.close(fig)
 
 
@@ -291,7 +296,7 @@ def make_group_plots(path: Path, band: str, beacon_dist):
 
     WSPR_NORM = json.load(open("data/wspr_norm.json"))
     RX = path.parent.name.split("_")[1]
-    dir_path = FIGURE_GROUP_PATH / path.relative_to(path.parent.parent) / band
+    dir_path = FIGURE_GROUP_PATH / path.relative_to(path.parent.parent)
     dir_path.mkdir(parents=True, exist_ok=True)
 
     jsons = sorted(path.glob(f"{band}/*.json"))
@@ -303,4 +308,4 @@ def make_group_plots(path: Path, band: str, beacon_dist):
         "dnorm": get_difference_nomral(WSPR_NORM[path.parent.name][band], group[rx])
     } for rx in group]
 
-    plot_group_errors_bars(dicts, dir_path)
+    plot_group_errors_bars(dicts, band, RX, dir_path)
