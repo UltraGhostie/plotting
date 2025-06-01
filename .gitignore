@@ -14,3 +14,5 @@ data/data
 data/figures
 data/import_figures.tex
 data/captions.json
+data/beacon_dist.json
+data/wspr_norm.json
