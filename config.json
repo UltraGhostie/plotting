@@ -16,6 +16,10 @@
       "tx": "WW0WWV",
       "rx": "EA8BFK",
       "noise": "Residential"
+    },{
+      "tx": "TI4JWC",
+      "rx": "OE9GHV",
+      "noise": "Residential"
     }
   ]
 }

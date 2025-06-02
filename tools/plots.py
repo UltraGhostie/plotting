@@ -55,10 +55,10 @@ def get_per_hour_distros(path: Path):
             req_snr.append(float(np.percentile(snr_hour, 1)) + SNR_OFFSET)
         else:
             normal.append({"snr": np.nan, "up": np.nan, "lw": np.nan})
-            distro.append({"snr": [], "p": []})
+            distro.append({"snr": [], "p": [], "size": size})
             req_snr.append(np.nan)
 
-    return normal, distro, req_snr
+    return normal, distro, req_snr, len(data)
 
 
 def get_difference_nomral(base: list, comparison: list):
@@ -238,7 +238,7 @@ def make_point_plots(path: Path, band: str, snr: list[float], snr_up: list[float
         "lw": abs(lw / 1.28)
     } for s, up, lw in zip(snr, snr_up, snr_lw)]
 
-    wspr_norm, wspr_distro, wspr_req_snr = get_per_hour_distros(path / f"{band}.json")
+    wspr_norm, wspr_distro, wspr_req_snr, _ = get_per_hour_distros(path / f"{band}.json")
     dnorm = get_difference_nomral(wspr_norm, voacap_norm)
     WSPR_NORM.setdefault(path.parent.name, {})[band] = wspr_norm
 
@@ -248,12 +248,10 @@ def make_point_plots(path: Path, band: str, snr: list[float], snr_up: list[float
 
 
 def plot_group_errors_bars(dicts: list, band, center, path: Path):
-    rx, dist, dnorm = zip(*[(d["rx"], d["dist"], d["dnorm"]) for d in dicts])
+    rx, dist, dnorm , size = zip(*[(d["rx"], d["dist"], d["dnorm"], d["samples"]) for d in dicts])
     avg_dsnr, avg_dup, avg_dlw = [], [], []
-    size = []
 
     for dn in dnorm:
-        size.append(len(dn))
         snr, up, lw = zip(*[(d["snr"], d["up"], d["lw"]) for d in dn])
 
         avg_dsnr.append(np.nanmean(np.abs(np.array(snr))))
@@ -309,14 +307,19 @@ def make_group_plots(path: Path, band: str, beacon_dist):
     dir_path = FIGURE_GROUP_PATH / path.relative_to(path.parent.parent)
     dir_path.mkdir(parents=True, exist_ok=True)
 
+    #Get hourly normal snr distro and total sample size per beacon
     jsons = sorted(path.glob(f"{band}/*.json"))
-    group = {file_path.stem.split("_")[1]: get_per_hour_distros(file_path)[0] for file_path in jsons}
+    group = {file_path.stem.split("_")[1]: {"norm": norm, "samples": samples}
+             for file_path in jsons
+             for norm, _, _, samples in [get_per_hour_distros(file_path)]}
+
+    #Filer out when one of the beacons lacks data in a band
     dicts = []
     for rx in group:
         if path.parent.name not in WSPR_NORM or band not in WSPR_NORM[path.parent.name]:
             continue
 
-        dnorm = get_difference_nomral(WSPR_NORM[path.parent.name][band], group[rx])
+        dnorm = get_difference_nomral(WSPR_NORM[path.parent.name][band], group[rx]["norm"])
 
         if all(all(np.isnan(v) for v in d.values()) for d in dnorm):
             continue
@@ -324,7 +327,8 @@ def make_group_plots(path: Path, band: str, beacon_dist):
         dicts.append({
             "rx": rx,
             "dist": beacon_dist[f"{RX}_{rx}"],
-            "dnorm": dnorm
+            "dnorm": dnorm,
+            "samples": group[rx]["samples"]
         })
 
     if len(dicts) != 0:
