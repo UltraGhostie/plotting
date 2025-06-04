@@ -13,7 +13,7 @@ from timezonefinder import TimezoneFinder
 from tools.wspr import wsprlive_get_info, wsprlive_pull_one_month, wsprlive_get_info_group, wsprlive_get
 from tools.voacap import run_voacap
 from tools.voacap_extractor import extract
-from tools.plots import make_point_plots, CAPTIONS, make_group_plots, WSPR_NORM
+from tools.plots import make_point_plots, CAPTIONS, make_group_plots, WSPR_NORM, POWER
 from tools.latex import gen_latex
 
 global FROM_DATE, TO_DATE, CONFIG, SSN_DATA
@@ -36,6 +36,8 @@ def _r_lat(r: float):
 def _r_lon(r: float, rx_lat: float):
     return (r * 360) / (EARTH_LON * math.cos(math.radians(rx_lat)))
 
+def dbw_to_watt(dbw):
+    return 10 ** (dbw / 10) / 1000
 
 def haversine(lat1, lon1, lat2, lon2):
     lat1_rad = math.radians(lat1)
@@ -80,9 +82,9 @@ def one_month(circuit, current_datetime, beacon_dist):
     RX, _RX = circuit["rx"], circuit["rx"].replace("/", "∕")
     CIRCUIT = f"{abs(tx_lat):05.2f}{'N' if tx_lat >= 0 else 'S'}   {abs(tx_lon):06.2f}{'E' if tx_lon >= 0 else 'W'}    {abs(rx_lat):05.2f}{'N' if rx_lat >= 0 else 'S'}   {abs(rx_lon):06.2f}{'E' if rx_lon >= 0 else 'W'}"
     NOISE = circuit['noise']
-    POWER = f"{properties['power'] * 0.0008:.4f}"  # divide by 1000 and 80% efficiency, VOACAP online does that
+    PW = f"{dbw_to_watt(properties['power']) * 0.8:.4f}"  # 80% efficiency, VOACAP online does that
 
-    run_voacap(MONTH, SSN, _TX, _RX, CIRCUIT, NOISE, POWER)
+    run_voacap(MONTH, SSN, _TX, _RX, CIRCUIT, NOISE, PW)
     print()
 
     sub_path = f"{_TX}_{_RX}/{MONTH.replace(" ", "_")}"
@@ -91,6 +93,7 @@ def one_month(circuit, current_datetime, beacon_dist):
     prefix_path = DATA_POINT_PATH / sub_path
     local_tz = ZoneInfo(TimezoneFinder().timezone_at(lat=rx_lat, lng=rx_lon))
     wsprlive_pull_one_month(TX, RX, current_datetime, local_tz, prefix_path)
+    POWER[f"{_TX}_{_RX}"] = properties['power']
 
     print(" Point pull done!\n")
 
@@ -104,6 +107,7 @@ def one_month(circuit, current_datetime, beacon_dist):
     for point in group:
         _rx = point["rx_sign"].replace("/", "∕")
         beacon_dist[f"{_RX}_{_rx}"] = haversine(rx_lat, rx_lon, point["rx_lat"], point["rx_lon"])
+        POWER[f"{_TX}_{_rx}"] = point['power']
 
         suffix_path = f"/{_TX}_{_rx}"
         local_tz = ZoneInfo(TimezoneFinder().timezone_at(lat=point["rx_lat"], lng=point["rx_lon"]))
@@ -127,6 +131,8 @@ def prep_data():
             current_datetime += relativedelta(months=1)
     with open(Path("data/beacon_dist.json"), "w") as file:
         json.dump(beacon_dist, file)
+    with open(Path("data/power.json"), "w") as file:
+        json.dump(POWER, file)
 
 
 def plot_point():

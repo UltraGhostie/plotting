@@ -41,7 +41,7 @@ def wsprlive_get_info_group(circuit, current_datetime, c_lat: float, c_lon: floa
     end = (current_datetime + relativedelta(months=1)).strftime("%Y-%m-%d %H:%M:%S")
 
     return wsprlive_get(
-        f"SELECT DISTINCT rx_sign, rx_lat, rx_lon "
+        f"SELECT DISTINCT rx_sign, rx_lat, rx_lon, power "
         f"FROM rx "
         f"WHERE tx_sign = '{circuit['tx']}' AND rx_sign != '{circuit['rx']}' "
         f"AND abs(rx_lat - CAST({c_lat} AS Float32)) <= {r_lat} "

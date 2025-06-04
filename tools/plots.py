@@ -24,6 +24,7 @@ FIGURE_POINT_PATH: Path = Path("data/figures/point")
 FIGURE_GROUP_PATH: Path = Path("data/figures/group")
 
 WSPR_NORM: dict[str, dict[str, list]] = {}
+POWER: dict[str, float] = {}
 CAPTIONS = {}
 
 
@@ -302,6 +303,7 @@ def make_group_plots(path: Path, band: str, beacon_dist):
     global WSPR_NORM
 
     WSPR_NORM = json.load(open("data/wspr_norm.json"))
+    POWER = json.load(open("data/power.json"))
 
     RX = path.parent.name.split("_")[1]
     dir_path = FIGURE_GROUP_PATH / path.relative_to(path.parent.parent)
