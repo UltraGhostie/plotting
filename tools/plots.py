@@ -249,7 +249,7 @@ def make_point_plots(path: Path, band: str, snr: list[float], snr_up: list[float
 
 
 def plot_group_errors_bars(dicts: list, band, center, path: Path):
-    rx, dist, dnorm , size = zip(*[(d["rx"], d["dist"], d["dnorm"], d["samples"]) for d in dicts])
+    rx, dist, dnorm, size = zip(*[(d["rx"], d["dist"], d["dnorm"], d["samples"]) for d in dicts])
     avg_dsnr, avg_dup, avg_dlw = [], [], []
 
     for dn in dnorm:
@@ -305,23 +305,32 @@ def make_group_plots(path: Path, band: str, beacon_dist):
     WSPR_NORM = json.load(open("data/wspr_norm.json"))
     POWER = json.load(open("data/power.json"))
 
+    if path.parent.name not in WSPR_NORM or band not in WSPR_NORM[path.parent.name]:
+        return
+    power = POWER[path.parent.name]
+    wspr_norm = WSPR_NORM[path.parent.name][band]
+    for entry in wspr_norm:
+        entry["snr"] -= power
+
     RX = path.parent.name.split("_")[1]
     dir_path = FIGURE_GROUP_PATH / path.relative_to(path.parent.parent)
     dir_path.mkdir(parents=True, exist_ok=True)
 
-    #Get hourly normal snr distro and total sample size per beacon
+    # Get hourly normal snr distro and total sample size per beacon
     jsons = sorted(path.glob(f"{band}/*.json"))
     group = {file_path.stem.split("_")[1]: {"norm": norm, "samples": samples}
              for file_path in jsons
              for norm, _, _, samples in [get_per_hour_distros(file_path)]}
 
-    #Filer out when one of the beacons lacks data in a band
+    # Filer out when one of the beacons lacks data in a band
     dicts = []
     for rx in group:
-        if path.parent.name not in WSPR_NORM or band not in WSPR_NORM[path.parent.name]:
-            continue
+        power = POWER[f"{path.parent.name.split("_")[0]}_{rx}"]
+        group_norm = group[rx]["norm"]
+        for entry in group_norm:
+            entry["snr"] -= power
 
-        dnorm = get_difference_nomral(WSPR_NORM[path.parent.name][band], group[rx]["norm"])
+        dnorm = get_difference_nomral(wspr_norm, group_norm)
 
         if all(all(np.isnan(v) for v in d.values()) for d in dnorm):
             continue
