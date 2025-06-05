@@ -62,7 +62,7 @@ def gen_point_figures():
                             f.write("\t\t\t\t\\hfill\n")
                             write_figure_block(right, f)
                         f.write("\t\t\t\\end{figure}\n")
-                        if fig_count % 2 == 0: f.write("\\clearpage")
+                        if fig_count % 2 == 0: f.write("\\clearpage\n")
                         fig_count += 1
 
 
@@ -91,7 +91,7 @@ def gen_group_figures():
                         f.write("\t\t\t\t\\hfill\n")
                         write_figure_block(right, f)
                     f.write("\t\t\t\\end{figure}\n")
-                    if fig_count % 2 == 0: f.write("\\clearpage")
+                    if fig_count % 2 == 0: f.write("\\clearpage\n")
                     fig_count += 1
 
 
