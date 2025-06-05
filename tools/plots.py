@@ -126,7 +126,7 @@ def plot_req_snr(req_snr: list, path: Path):
     ax.plot(x, pdf, lw=1, color="#0052CC")
     ax.fill_between(x, 0, pdf, alpha=0.2)
 
-    ax.set_title(f"WSPR Fitted Bottom 1% SNR Distribution")
+    ax.set_title(f"WSPR Fitted Bottom 1% SNR Distribution (Offset)")
     ax.set_ylabel("Probability Density")
     ax.set_xlabel("SNR (dB·Hz)")
 

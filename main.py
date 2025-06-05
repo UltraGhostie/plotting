@@ -153,6 +153,11 @@ def plot_point():
             snrup = [d["value"] for d in extract("SNR UP", voacapx, band=band)]
             snrlw = [d["value"] for d in extract("SNR LW", voacapx, band=band)]
 
+            #Compensate for 1-24 hour to 00:00-23:00 hour conversion
+            snr = [snr[-1]] + snr[:-1]
+            snrup = [snrup[-1]] + snrup[:-1]
+            snrlw = [snrlw[-1]] + snrlw[:-1]
+
             make_point_plots(path, f"{band:02d}", snr, snrup, snrlw)
         print()
     with open(Path("data/captions.json"), "w") as file:
@@ -181,7 +186,6 @@ def plot_group():
 def main():
     #sql = "SELECT tx_sign, rx_sign, count() AS total_conversations FROM wspr.rx WHERE time >= '2025-01-01 00:00:00' AND time < '2025-02-01 00:00:00' AND rx_lat >= 45 AND rx_lat < 50 AND rx_lon >= 5 AND rx_lon < 10 GROUP BY tx_sign, rx_sign ORDER BY total_conversations DESC LIMIT 100"
     #sql2 = "SELECT rx_sign, rx_lat, rx_lon FROM wspr.rx WHERE time >= '2025-01-01 00:00:00' AND time < '2025-02-01 00:00:00' AND rx_lat >= 45 AND rx_lat < 50 AND rx_lon >= 5 AND rx_lon < 10 GROUP BY rx_sign, rx_lat, rx_lon ORDER BY (rx_lat - 47.5)*(rx_lat - 47.5) + (rx_lon - 7.5)*(rx_lon - 7.5) ASC LIMIT 100"
-    #print(wsprlive_get(sql2))
     read_config()
     prep_data()
     plot_point()
