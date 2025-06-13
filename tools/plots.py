@@ -18,6 +18,7 @@ plt.rcParams.update({
 })
 
 SNR_OFFSET = 34  # SNR offset to compensate for bandwidth differences between VOACAP and WSPR
+REQ_SNR = -28
 HOURS = range(24)
 
 FIGURE_POINT_PATH: Path = Path("data/figures/point")
@@ -34,6 +35,7 @@ def get_per_hour_distros(path: Path):
     normal: list[dict[str, float]] = []
     distro: list[dict[str, list[float] | int]] = []
     req_snr: list[float] = []
+    rel: list[float] = []
 
     for H in HOURS:
         snr_hour = sorted([
@@ -53,13 +55,15 @@ def get_per_hour_distros(path: Path):
             snr, count = zip(*Counter(snr_hour).items())
             distro.append({"snr": list(snr), "p": [c / size for c in count], "size": size})
 
-            req_snr.append(float(np.percentile(snr_hour, 1)) + SNR_OFFSET)
+            req_snr.append(float(np.percentile(snr_hour, 1)))
+            rel.append(sum(1 for snr in snr_hour if snr >= REQ_SNR) / size)
         else:
             normal.append({"snr": np.nan, "up": np.nan, "lw": np.nan})
             distro.append({"snr": [], "p": [], "size": size})
             req_snr.append(np.nan)
+            rel.append(0)
 
-    return normal, distro, req_snr, len(data)
+    return normal, distro, req_snr, rel
 
 
 def get_difference_nomral(base: list, comparison: list):
@@ -70,8 +74,9 @@ def get_difference_nomral(base: list, comparison: list):
     } for b, c in zip(base, comparison)]
 
 
-def plot_errors_bars(dnorm: list, path: Path):
+def plot_errors_bars(dnorm: list, distro: list, path: Path):
     dsnr, dup, dlw = zip(*[(d["snr"], d["up"], d["lw"]) for d in dnorm])
+    size = [e["size"] for e in distro]
     fig, ax = plt.subplots(constrained_layout=True)  # figsize=(12, 4)
 
     bar_width = 0.6 / 3
@@ -82,7 +87,7 @@ def plot_errors_bars(dnorm: list, path: Path):
     ax.bar(x + bar_width, dlw, color="#2CA02C", lw=1, label=r"$\Delta \sigma_\mathrm{LW}$", width=bar_width)
 
     ax.set_title("Hourly VOACAP Parameter Deviations from WSPR")
-    ax.set_ylabel("Deviation (dB·Hz)")
+    ax.set_ylabel("Deviation (dB)")
     ax.set_xlabel("Hour (UTC)")
 
     ax.set_xticks(x)
@@ -93,14 +98,22 @@ def plot_errors_bars(dnorm: list, path: Path):
     ax.grid(True, which='major', alpha=0.5)
     ax.grid(True, which='minor', alpha=0.3)
 
+    ax_top = ax.twiny()
+    ax_top.set_xlim(ax.get_xlim())  # sync the range
+    ax_top.set_xticks(x)
+    ax_top.set_xticklabels(size, rotation=45, ha="left")
+    ax_top.xaxis.set_ticks_position("top")
+    ax_top.xaxis.set_label_position("top")
+    ax_top.set_xlabel("Sample Size")
+
     avg_dsnr = np.nanmean(np.abs(np.array(dsnr)))
     avg_dup = np.nanmean(np.abs(np.array(dup)))
     avg_dlw = np.nanmean(np.abs(np.array(dlw)))
     latex_caption = (
         rf"Average deviations:"
-        rf"\\$\overline{{\Delta \mathrm{{SNR}}}} = {avg_dsnr:.2f}\,\mathrm{{dB\cdot Hz}}$"
-        rf"\\$\overline{{\Delta \sigma_\mathrm{{UP}}}} = {avg_dup:.2f}\,\mathrm{{dB\cdot Hz}}$"
-        rf"\\$\overline{{\Delta \sigma_\mathrm{{LW}}}} = {avg_dlw:.2f}\,\mathrm{{dB\cdot Hz}}$"
+        rf"\\$\overline{{\Delta \mathrm{{SNR}}}} = {avg_dsnr:.2f}\,\mathrm{{dB}}$"
+        rf"\\$\overline{{\Delta \sigma_\mathrm{{UP}}}} = {avg_dup:.2f}\,\mathrm{{dB}}$"
+        rf"\\$\overline{{\Delta \sigma_\mathrm{{LW}}}} = {avg_dlw:.2f}\,\mathrm{{dB}}$"
     )
 
     path = path / "error_bars.pdf"
@@ -128,7 +141,7 @@ def plot_req_snr(req_snr: list, path: Path):
 
     ax.set_title(f"WSPR Fitted Bottom 1% SNR Distribution (Offset)")
     ax.set_ylabel("Probability Density")
-    ax.set_xlabel("SNR (dB·Hz)")
+    ax.set_xlabel("SNR (dB)")
 
     ax.margins(x=0, y=0)
     ymin, ymax = ax.get_ylim()
@@ -142,7 +155,7 @@ def plot_req_snr(req_snr: list, path: Path):
     latex_caption = (
         rf"\\REQ SNR estimation"
         rf"\\Sample size: $n = {len(data)}$"
-        rf"\\Fitted Normal: $\mu = {mu:.2f}$ dB$\cdot$Hz,\quad $\sigma = {o:.2f}$ dB$\cdot$Hz"
+        rf"\\Fitted Normal: $\mu = {mu:.2f}$ dB,\quad $\sigma = {o:.2f}$ dB"
     )
 
     path = path / f"low_req_snr.pdf"
@@ -204,7 +217,7 @@ def plot_hour_normal_distros(wspr_norm: list, voacap_norm: list, wspr_distro: li
 
         ax.set_title(f"SNR Distribution at Hour {H:02d} (UTC)")
         ax.set_ylabel("Probability Density")
-        ax.set_xlabel("SNR (dB·Hz)")
+        ax.set_xlabel("SNR (dB)")
 
         ax.margins(x=0, y=0)
         ymin, ymax = ax.get_ylim()
@@ -239,11 +252,25 @@ def make_point_plots(path: Path, band: str, snr: list[float], snr_up: list[float
         "lw": abs(lw / 1.28)
     } for s, up, lw in zip(snr, snr_up, snr_lw)]
 
-    wspr_norm, wspr_distro, wspr_req_snr, _ = get_per_hour_distros(path / f"{band}.json")
+    wspr_norm, wspr_distro, wspr_req_snr, rel = get_per_hour_distros(path / f"{band}.json")
+    print("WSPR REL:", [f"{v:.2f}" for v in rel], sep="\t")
+
+    print("INTR REL:",
+          [
+              "-.00" if (o := (n["lw"] if REQ_SNR > n["snr"] else n["up"])) == 0
+              else (
+                  " nan" if np.isnan((v := norm.cdf((n["snr"] - REQ_SNR) / o)))
+                  else f"{v:.2f}"
+              )
+              for n in wspr_norm
+          ],
+          sep="\t")
+
+
     dnorm = get_difference_nomral(wspr_norm, voacap_norm)
     WSPR_NORM.setdefault(path.parent.name, {})[band] = wspr_norm
 
-    plot_errors_bars(dnorm, dir_path)
+    plot_errors_bars(dnorm, wspr_distro, dir_path)
     plot_req_snr(wspr_req_snr, dir_path)
     plot_hour_normal_distros(wspr_norm, voacap_norm, wspr_distro, dir_path)
 
