@@ -18,7 +18,7 @@ plt.rcParams.update({
 })
 
 SNR_OFFSET = 34  # SNR offset to compensate for bandwidth differences between VOACAP and WSPR
-REQ_SNR = -28
+REQ_SNR = 3 - SNR_OFFSET
 HOURS = range(24)
 
 FIGURE_POINT_PATH: Path = Path("data/figures/point")
