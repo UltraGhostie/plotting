@@ -33,7 +33,7 @@ def wsprlive_get_info(circuit, current_datetime):
         f"WHERE tx_sign = '{circuit['tx']}' AND rx_sign = '{circuit['rx']}' "
         f"AND '{start}' <= time AND time < '{end}' "
         f"LIMIT 1")
-    return json_obj[0] if json else {}
+    return json_obj[0] if json_obj else {}
 
 
 def wsprlive_get_info_group(circuit, current_datetime, c_lat: float, c_lon: float, r_lat: float, r_lon: float):
