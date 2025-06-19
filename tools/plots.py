@@ -47,7 +47,7 @@ def get_per_hour_distros(path: Path):
         size = len(snr_hour)
 
         if size >= 1:
-            median = float(np.median(snr_hour))
+            median = float(np.percentile(snr_hour, 50))
             o_up = np.nan if (o := abs(median - float(np.percentile(snr_hour, 90))) / 1.28) == 0 else o
             o_lw = np.nan if (o := abs(median - float(np.percentile(snr_hour, 10))) / 1.28) == 0 else o
             normal.append({"snr": median, "up": o_up, "lw": o_lw})
