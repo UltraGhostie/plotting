@@ -48,9 +48,9 @@ def get_per_hour_distros(path: Path):
 
         if size >= 1:
             median = float(np.percentile(snr_hour, 50))
-            p90 = abs(median - float(np.percentile(snr_hour, 90))) / 1.28
-            p10 = abs(median - float(np.percentile(snr_hour, 10))) / 1.28
-            normal.append({"snr": median, "up": p90, "lw": p10})
+            o_up = np.nan if (o := abs(median - float(np.percentile(snr_hour, 90))) / 1.28) == 0 else o
+            o_lw = np.nan if (o := abs(median - float(np.percentile(snr_hour, 10))) / 1.28) == 0 else o
+            normal.append({"snr": median, "up": o_up, "lw": o_lw})
 
             snr, count = zip(*Counter(snr_hour).items())
             distro.append({"snr": list(snr), "p": [c / size for c in count], "size": size})
@@ -127,9 +127,8 @@ def plot_req_snr(req_snr: list, path: Path):
     data = np.array(req_snr)
     data = data[~np.isnan(data)]
 
-    EPS = 1e-16  # Dodge sigma = 0
     mu, o = norm.fit(data)
-    o = max(o, EPS)
+    if o == 0: return
     o_off = 4
     x = np.linspace(mu - o_off * o, mu + o_off * o, 300)
     pdf = norm.pdf(x, mu, o)
@@ -171,17 +170,17 @@ def plot_hour_normal_distros(wspr_norm: list, voacap_norm: list, wspr_distro: li
         if not hour_distro["snr"]: continue
 
         # Parameters for two split normal distributions
-        EPS = 1e-16  # Dodge sigma = 0
-
         wspr = wspr_norm[H]
         mu1 = wspr["snr"]
-        o_l1 = max(wspr["lw"], EPS)
-        o_u1 = max(wspr["up"], EPS)
+        o_l1 = wspr["lw"]
+        o_u1 = wspr["up"]
 
         voacap = voacap_norm[H]
         mu2 = voacap["snr"]
-        o_l2 = max(voacap["lw"], EPS)
-        o_u2 = max(voacap["up"], EPS)
+        o_l2 = voacap["lw"]
+        o_u2 = voacap["up"]
+
+        if o_l1 == 0 or o_u1 == 0 or o_l2 == 0 or o_u2 == 0: continue
 
         A1, A2 = np.sqrt(2 / np.pi) / (o_l1 + o_u1), np.sqrt(2 / np.pi) / (o_l2 + o_u2)
 
@@ -224,15 +223,15 @@ def plot_hour_normal_distros(wspr_norm: list, voacap_norm: list, wspr_distro: li
         padding = 0.05 * (ymax - ymin)
         ax.set_ylim(ymin, ymax + padding)
 
-        ax.legend(handles=[label1, label2, label3])
+        ax.legend(handles=[label1, label2, label3], framealpha=0.5)
         ax.minorticks_on()
         ax.grid(True, which='major', alpha=0.5)
         ax.grid(True, which='minor', alpha=0.3)
 
         latex_caption = (
             rf"\\WSPR sample size: $n = {hour_distro["size"]}$"
-            rf"\\WSPR: $\mu = {int(mu1)}$,\quad $\sigma_{{\mathrm{{UP}}}} = {o_u1:.2f}$,\quad $\sigma_{{\mathrm{{LW}}}} = {o_l1:.2f}$"
-            rf"\\VOACAP: $\mu = {int(mu2)}$,\quad $\sigma_{{\mathrm{{UP}}}} = {o_u2:.2f}$,\quad $\sigma_{{\mathrm{{LW}}}} = {o_l2:.2f}$"
+            rf"\\WSPR: $\mu = {int(mu1) if not np.isnan(mu1) else "nan"}$,\quad $\sigma_{{\mathrm{{UP}}}} = {o_u1:.2f}$,\quad $\sigma_{{\mathrm{{LW}}}} = {o_l1:.2f}$"
+            rf"\\VOACAP: $\mu = {int(mu2) if not np.isnan(mu2) else "nan"}$,\quad $\sigma_{{\mathrm{{UP}}}} = {o_u2:.2f}$,\quad $\sigma_{{\mathrm{{LW}}}} = {o_l2:.2f}$"
         )
 
         file_path = path / f"normal_h{H:02d}.pdf"
@@ -248,24 +247,18 @@ def make_point_plots(path: Path, band: str, snr: list[float], snr_up: list[float
 
     voacap_norm = [{
         "snr": s - SNR_OFFSET,
-        "up": abs(up / 1.28),
-        "lw": abs(lw / 1.28)
+        "up": np.nan if up == 0 else abs(up / 1.28),
+        "lw": np.nan if lw == 0 else abs(lw / 1.28)
     } for s, up, lw in zip(snr, snr_up, snr_lw)]
 
-    wspr_norm, wspr_distro, wspr_req_snr, rel = get_per_hour_distros(path / f"{band}.json")
-    print("WSPR REL:", [f"{v:.2f}" for v in rel], sep="\t")
+    wspr_norm, wspr_distro, wspr_req_snr, wrel = get_per_hour_distros(path / f"{band}.json")
+    print("WSPR REL:", [f"{v:.2f}" for v in wrel], sep="\t")
 
-    print("INTR REL:",
-          [
-              "-.00" if (o := (n["lw"] if REQ_SNR > n["snr"] else n["up"])) == 0
-              else (
-                  " nan" if np.isnan((v := norm.cdf((n["snr"] - REQ_SNR) / o)))
-                  else f"{v:.2f}"
-              )
-              for n in wspr_norm
-          ],
-          sep="\t")
-
+    irel: list[float] = []
+    for n in wspr_norm:
+        o = n["lw"] if REQ_SNR > n["snr"] else n["up"]
+        irel.append(norm.cdf((n["snr"] - REQ_SNR) / o) if o != 0 else np.nan)
+    print("INTR REL:", [f"{v:.2f}" if not np.isnan(v) else " nan" for v in irel], sep="\t")
 
     dnorm = get_difference_nomral(wspr_norm, voacap_norm)
     WSPR_NORM.setdefault(path.parent.name, {})[band] = wspr_norm

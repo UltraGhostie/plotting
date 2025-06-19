@@ -153,7 +153,6 @@ def plot_point():
             snrup = [d["value"] for d in extract("SNR UP", voacapx, band=band)]
             snrlw = [d["value"] for d in extract("SNR LW", voacapx, band=band)]
             rel = [d["value"] for d in extract("REL", voacapx, band=band)]
-            print("VOA REL:", [f"{v:.2f}" for v in rel], sep="\t")
 
             #Compensate for 1-24 hour to 00:00-23:00 hour conversion
             snr = [snr[-1]] + snr[:-1]
@@ -161,6 +160,7 @@ def plot_point():
             snrlw = [snrlw[-1]] + snrlw[:-1]
             rel = [rel[-1]] + rel[:-1]
 
+            print("VOA REL:", [f"{v:.2f}" for v in rel], sep="\t")
             make_point_plots(path, f"{band:02d}", snr, snrup, snrlw)
         print()
     with open(Path("data/captions.json"), "w") as file:
