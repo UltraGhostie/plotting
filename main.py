@@ -13,19 +13,20 @@ from timezonefinder import TimezoneFinder
 from tools.wspr import wsprlive_get_info, wsprlive_pull_one_month, wsprlive_get_info_group, wsprlive_get
 from tools.voacap import run_voacap
 from tools.voacap_extractor import extract
-from tools.plots import make_point_plots, CAPTIONS, make_group_plots, WSPR_NORM, POWER
+from tools.plots import make_point_plots, CAPTIONS, make_group_plots, WSPR_NORM, POWER, magic
 from tools.latex import gen_latex
 
 global FROM_DATE, TO_DATE, CONFIG, SSN_DATA
 
-ALPHA: float = 15
+ALPHA: float = 100
 EARTH_LAT: float = 40007.863
 EARTH_LON: float = 40075.017
 
 DATA_POINT_PATH: Path = Path("data/data/point")
-FIGURE_POINT_PATH: Path = Path("data/figures/point")
-
+DATA_TABLE_PATH: Path = Path("data/data/table")
 DATA_GROUP_PATH: Path = Path("data/data/group")
+
+FIGURE_POINT_PATH: Path = Path("data/figures/point")
 FIGURE_GROUP_PATH: Path = Path("data/figures/group")
 
 
@@ -98,7 +99,7 @@ def one_month(circuit, current_datetime, beacon_dist):
     print(" Point pull done!\n")
 
     # Point to Group
-    r = ALPHA * math.sqrt(properties["distance"])
+    r = ALPHA# * math.sqrt(properties["distance"])
     r_lat = _r_lat(r)
     r_long = _r_lon(r, rx_lat)
 
@@ -130,13 +131,14 @@ def prep_data():
             one_month(circuit, current_datetime, beacon_dist)
             current_datetime += relativedelta(months=1)
     with open(Path("data/beacon_dist.json"), "w") as file:
-        json.dump(beacon_dist, file)
+        json.dump(beacon_dist, file, indent=2)
     with open(Path("data/power.json"), "w") as file:
-        json.dump(POWER, file)
+        json.dump(POWER, file, indent=2)
 
 
 def plot_point():
     if os.path.exists(FIGURE_POINT_PATH): shutil.rmtree(FIGURE_POINT_PATH)
+    if os.path.exists(DATA_TABLE_PATH): shutil.rmtree(DATA_TABLE_PATH)
 
     print("\n Plotting for point...")
     dirs = sorted([p for p in DATA_POINT_PATH.glob("*/*") if p.is_dir()])
@@ -160,13 +162,13 @@ def plot_point():
             snrlw = [snrlw[-1]] + snrlw[:-1]
             rel = [rel[-1]] + rel[:-1]
 
-            print("VOA REL:", [f"{v:.2f}" for v in rel], sep="\t")
-            make_point_plots(path, f"{band:02d}", snr, snrup, snrlw)
+            make_point_plots(path, f"{band:02d}", snr, snrup, snrlw, rel)
         print()
     with open(Path("data/captions.json"), "w") as file:
-        json.dump(CAPTIONS, file)
+        json.dump(CAPTIONS, file, indent=2)
     with open(Path("data/wspr_norm.json"), "w") as file:
-        json.dump(WSPR_NORM, file)
+        json.dump(WSPR_NORM, file, indent=2)
+    #magic()
 
 
 def plot_group():
@@ -183,10 +185,11 @@ def plot_group():
             make_group_plots(path, band_path.name, beacon_dist)
         print()
     with open(Path("data/captions.json"), "w") as file:
-        json.dump(CAPTIONS, file)
+        json.dump(CAPTIONS, file, indent=2)
 
 
 def main():
+
     read_config()
     prep_data()
     plot_point()

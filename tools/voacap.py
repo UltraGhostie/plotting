@@ -32,7 +32,7 @@ ANTENNA       2   15   15   19     0.000[default/isotrope     ]  0.0    0.0000
 ANTENNA       2   16   19   22     0.000[default/isotrope     ]  0.0    0.0000
 ANTENNA       2   17   22   26     0.000[default/isotrope     ]  0.0    0.0000
 ANTENNA       2   18   26   30     0.000[default/isotrope     ]  0.0    0.0000
-FREQUENCY  3.60 5.30 7.1010.1014.1018.1021.1024.9028.20 0.00 0.00
+FREQUENCY  1.84 3.60 5.30 7.1010.1014.1018.1021.1024.9028.20 50.29
 METHOD       30    0
 EXECUTE
 QUIT"""

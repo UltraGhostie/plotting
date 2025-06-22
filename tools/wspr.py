@@ -77,4 +77,4 @@ def wsprlive_pull_one_month(tx, rx, current_datetime, local_tz, prefix_path, suf
         full_path = prefix_path / f"{band:02d}{suffix_path}.json"
         full_path.parent.mkdir(parents=True, exist_ok=True)
         with open(full_path, "w") as file:
-            json.dump(list(group), file)
+            json.dump(list(group), file, indent=2)
