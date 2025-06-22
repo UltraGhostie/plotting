@@ -13,7 +13,7 @@ from timezonefinder import TimezoneFinder
 from tools.wspr import wsprlive_get_info, wsprlive_pull_one_month, wsprlive_get_info_group, wsprlive_get
 from tools.voacap import run_voacap
 from tools.voacap_extractor import extract
-from tools.plots import make_point_plots, CAPTIONS, make_group_plots, WSPR_NORM, POWER, magic
+from tools.plots import make_point_plots, CAPTIONS, make_group_plots, WSPR_NORM, POWER#, magic
 from tools.latex import gen_latex
 
 global FROM_DATE, TO_DATE, CONFIG, SSN_DATA
