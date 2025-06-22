@@ -389,19 +389,19 @@ def calculate_point_score(wspr_norm: list[dict[str, float]], voacap_norm: list[d
     print()
     print(
         "COHEN:",
-        f"{np.nanmean(cohen):.2f}",
+        f"{np.nanmean(np.abs(cohen)):.2f}",
         [f"{v:.2f}" if not np.isnan(v) else " -- " for v in cohen],
         sep="\t"
     )
     print(
         "LVR_U:",
-        f"{np.nanmean(lvr_up):.2f}",
+        f"{np.nanmean(np.abs(lvr_up)):.2f}",
         [f"{v:.2f}" if not np.isnan(v) else " -- " for v in lvr_up],
         sep="\t"
     )
     print(
         "LVR_L",
-        f"{np.nanmean(lvr_lw):.2f}",
+        f"{np.nanmean(np.abs(lvr_lw)):.2f}",
         [f"{v:.2f}" if not np.isnan(v) else " -- " for v in lvr_lw],
         sep="\t"
     )
