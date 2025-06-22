@@ -126,12 +126,23 @@ def plot_errors_bars(dnorm: list, distro: list, path: Path):
     plt.close(fig)
 
 
-def plot_req_snr(req_snr: list, path: Path):
+def plot_req_snr(req_snr: list, band:str, table_path:Path, path: Path):
     data = np.array(req_snr)
     data = data[~np.isnan(data)]
 
     mu, o = norm.fit(data)
     if o == 0: return
+
+    file_path = table_path / "DATA.json"
+    if file_path.exists():
+        with open(file_path, "r") as f:
+            data = json.load(f)
+            data[band] = REL
+    else:
+        data = {band: REL}
+    with open(file_path, "w") as f:
+        json.dump(data, f, indent=2)
+
     o_off = 4
     x = np.linspace(mu - o_off * o, mu + o_off * o, 300)
     pdf = norm.pdf(x, mu, o)
@@ -259,13 +270,13 @@ def calculate_point_rel(wspr_norm: list[dict[str, float]], voacap_rel: list[floa
     REL["VOACAP"] = {"avg": np.nanmean(voacap_rel), "rel": voacap_rel}
     REL["DIFF"] = {"avg": np.nanmean(diff_rel), "rel": diff_rel}
 
-    file_path = path / "REL.json"
+    file_path = path / "DATA.json"
     if file_path.exists():
         with open(file_path, "r") as f:
             data = json.load(f)
-            data[band] = REL
+            data["REL"][band] = REL
     else:
-        data = {band: REL}
+        data = {"REL": {band: REL}}
     with open(file_path, "w") as f:
         json.dump(data, f, indent=2)
 
@@ -366,22 +377,24 @@ def calculate_point_score(wspr_norm: list[dict[str, float]], voacap_norm: list[d
         sum(h_o < abs(v) for v in lvr_lw),
         sep="\t\t")
 
-    file_path = path / "Scores.json"
+    file_path = path / "DATA.json"
     if file_path.exists():
         with open(file_path, "r") as f:
             data = json.load(f)
-            data["cohen's d"].extend(cohen)
-            data["lvr_up"].extend(lvr_up)
-            data["lvr_lw"].extend(lvr_lw)
+            data["Score"]["cohen's d"].extend(cohen)
+            data["Score"]["lvr_up"].extend(lvr_up)
+            data["Score"]["lvr_lw"].extend(lvr_lw)
 
-            data["cohen's d"] = np.sort(data["cohen's d"]).tolist()
-            data["lvr_up"] = np.sort(data["lvr_up"]).tolist()
-            data["lvr_lw"] = np.sort(data["lvr_lw"]).tolist()
+            data["Score"]["cohen's d"] = np.sort(data["Score"]["cohen's d"]).tolist()
+            data["Score"]["lvr_up"] = np.sort(data["Score"]["lvr_up"]).tolist()
+            data["Score"]["lvr_lw"] = np.sort(data["Score"]["lvr_lw"]).tolist()
     else:
-        data = {
+        data = {"Score":
+            {
             "cohen's d": np.sort(cohen).tolist(),
             "lvr_up": np.sort(lvr_up).tolist(),
             "lvr_lw": np.sort(lvr_lw).tolist()
+            }
         }
     with open(file_path, "w") as f:
         json.dump(data, f, indent=2)
@@ -451,7 +464,7 @@ def calculate_point_score(wspr_norm: list[dict[str, float]], voacap_norm: list[d
 def make_point_plots(path: Path, band: str, snr: list[float], snr_up: list[float], snr_lw: list[float],
                      voacap_rel: list[float]):
     point_path = FIGURE_POINT_PATH / path.relative_to(path.parent.parent) / band
-    table_path = DATA_TABLE_PATH / path.relative_to(path.parent.parent) / band
+    table_path = DATA_TABLE_PATH / path.relative_to(path.parent.parent)
     point_path.mkdir(parents=True, exist_ok=True)
     table_path.mkdir(parents=True, exist_ok=True)
 
@@ -465,10 +478,10 @@ def make_point_plots(path: Path, band: str, snr: list[float], snr_up: list[float
 
     WSPR_NORM.setdefault(path.parent.name, {})[band] = wspr_norm
 
-    calculate_point_score(wspr_norm, voacap_norm, table_path.parent)
+    calculate_point_score(wspr_norm, voacap_norm, table_path)
     calculate_point_rel(wspr_norm, voacap_rel, count_rel, band, table_path)
     plot_errors_bars(get_difference_nomral(voacap_norm, wspr_norm), wspr_distro, point_path)
-    plot_req_snr(wspr_req_snr, point_path)
+    plot_req_snr(wspr_req_snr, band, table_path, point_path)
     plot_hour_normal_distros(wspr_norm, voacap_norm, wspr_distro, point_path)
 
 
