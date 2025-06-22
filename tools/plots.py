@@ -269,6 +269,7 @@ def calculate_point_rel(wspr_norm: list[dict[str, float]], voacap_rel: list[floa
     with open(file_path, "w") as f:
         json.dump(data, f, indent=2)
 
+    print("Reliabilty")
     print(
         "WSPR",
         f"{np.nanmean(interp_rel):.2f}",
@@ -385,6 +386,7 @@ def calculate_point_score(wspr_norm: list[dict[str, float]], voacap_norm: list[d
     with open(file_path, "w") as f:
         json.dump(data, f, indent=2)
     #"""
+    print()
     print(
         "COHEN:",
         f"{np.nanmean(cohen):.2f}",
