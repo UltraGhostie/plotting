@@ -13,12 +13,8 @@
   },
   "circuits": [
     {
-      "tx": "WW0WWV",
-      "rx": "EA8BFK",
-      "noise": "Rural"
-    },{
       "tx": "TI4JWC",
-      "rx": "OE9GHV",
+      "rx": "KPH",
       "noise": "Rural"
     }
   ]
