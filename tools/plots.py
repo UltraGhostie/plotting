@@ -77,7 +77,10 @@ def get_difference_nomral(base: list, comparison: list):
 
 def plot_errors_bars(dnorm: list, distro: list, path: Path):
     dsnr, dup, dlw = zip(*[(d["snr"], d["up"], d["lw"]) for d in dnorm])
-    size = [e["size"] for e in distro]
+    size = np.asarray([e["size"] for e in distro])
+    mask = (size != 0)
+    s = np.argmax(mask)
+    e = len(size) - np.argmax(mask[::-1])
     fig, ax = plt.subplots(constrained_layout=True)  # figsize=(12, 4)
 
     bar_width = 0.6 / 3
@@ -101,8 +104,8 @@ def plot_errors_bars(dnorm: list, distro: list, path: Path):
 
     ax_top = ax.twiny()
     ax_top.set_xlim(ax.get_xlim())  # sync the range
-    ax_top.set_xticks(x)
-    ax_top.set_xticklabels(size, rotation=45, ha="left")
+    ax_top.set_xticks(x[s:e])
+    ax_top.set_xticklabels(size[s:e], rotation=45, ha="left")
     ax_top.xaxis.set_ticks_position("top")
     ax_top.xaxis.set_label_position("top")
     ax_top.set_xlabel("Sample Size")
