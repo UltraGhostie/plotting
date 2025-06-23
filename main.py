@@ -13,7 +13,7 @@ from timezonefinder import TimezoneFinder
 from tools.wspr import wsprlive_get_info, wsprlive_pull_one_month, wsprlive_get_info_group, wsprlive_get
 from tools.voacap import run_voacap
 from tools.voacap_extractor import extract
-from tools.plots import make_point_plots, CAPTIONS, make_group_plots, WSPR_NORM, POWER#, magic
+from tools.plots import make_point_plots, CAPTIONS, make_group_plots  # , magic
 from tools.latex import gen_latex
 
 global FROM_DATE, TO_DATE, CONFIG, SSN_DATA
@@ -22,8 +22,8 @@ ALPHA: float = 100
 EARTH_LAT: float = 40007.863
 EARTH_LON: float = 40075.017
 
+DATA_TEMP_PATH: Path = Path("data/data/temp")
 DATA_POINT_PATH: Path = Path("data/data/point")
-DATA_TABLE_PATH: Path = Path("data/data/table")
 DATA_GROUP_PATH: Path = Path("data/data/group")
 
 FIGURE_POINT_PATH: Path = Path("data/figures/point")
@@ -37,8 +37,10 @@ def _r_lat(r: float):
 def _r_lon(r: float, rx_lat: float):
     return (r * 360) / (EARTH_LON * math.cos(math.radians(rx_lat)))
 
+
 def dbw_to_watt(dbw):
     return 10 ** (dbw / 10) / 1000
+
 
 def haversine(lat1, lon1, lat2, lon2):
     lat1_rad = math.radians(lat1)
@@ -68,7 +70,7 @@ def read_config():
     TO_DATE = datetime.strptime(time_period['to'] + "-01", "%Y-%m-%d").replace(tzinfo=ZoneInfo("UTC"))
 
 
-def one_month(circuit, current_datetime, beacon_dist):
+def one_month(circuit, current_datetime):
     properties = wsprlive_get_info(circuit, current_datetime)
     if not properties: return
 
@@ -90,16 +92,26 @@ def one_month(circuit, current_datetime, beacon_dist):
 
     sub_path = f"{_TX}_{_RX}/{MONTH.replace(" ", "_")}"
 
+    temp_path = DATA_TEMP_PATH / sub_path
+    temp_path.mkdir(parents=True, exist_ok=True)
+    file_path = temp_path / "TEMP.json"
+    if file_path.exists():
+        with open(file_path, "r") as f:
+            data = json.load(f)
+    else:
+        data = {}
+    data.setdefault("DIST", {})
+    data.setdefault("POWER", {})[f"{_TX}_{_RX}"] = properties['power']
+
     # Point to Point
     prefix_path = DATA_POINT_PATH / sub_path
     local_tz = ZoneInfo(TimezoneFinder().timezone_at(lat=rx_lat, lng=rx_lon))
     wsprlive_pull_one_month(TX, RX, current_datetime, local_tz, prefix_path)
-    POWER[f"{_TX}_{_RX}"] = properties['power']
 
     print(" Point pull done!\n")
 
     # Point to Group
-    r = ALPHA# * math.sqrt(properties["distance"])
+    r = ALPHA  # * math.sqrt(properties["distance"])
     r_lat = _r_lat(r)
     r_long = _r_lon(r, rx_lat)
 
@@ -107,13 +119,15 @@ def one_month(circuit, current_datetime, beacon_dist):
     group = wsprlive_get_info_group(circuit, current_datetime, rx_lat, rx_lon, r_lat, r_long)
     for point in group:
         _rx = point["rx_sign"].replace("/", "∕")
-        beacon_dist[f"{_RX}_{_rx}"] = haversine(rx_lat, rx_lon, point["rx_lat"], point["rx_lon"])
-        POWER[f"{_TX}_{_rx}"] = point['power']
+        data["DIST"][f"{_RX}_{_rx}"] = haversine(rx_lat, rx_lon, point["rx_lat"], point["rx_lon"])
+        data["POWER"][f"{_TX}_{_rx}"] = point['power']
 
         suffix_path = f"/{_TX}_{_rx}"
         local_tz = ZoneInfo(TimezoneFinder().timezone_at(lat=point["rx_lat"], lng=point["rx_lon"]))
         wsprlive_pull_one_month(TX, point["rx_sign"], current_datetime, local_tz, prefix_path, suffix_path)
 
+    with open(file_path, "w") as f:
+        json.dump(data, f, indent=2)
     print(" Group pull done!\n")
 
 
@@ -121,24 +135,17 @@ def prep_data():
     if os.path.exists(DATA_POINT_PATH): shutil.rmtree(DATA_POINT_PATH)
     if os.path.exists(DATA_GROUP_PATH): shutil.rmtree(DATA_GROUP_PATH)
 
-    beacon_dist = {}
-
     for circuit in CONFIG["circuits"]:
         circuit["noise"] = CONFIG["noise_levels"].get(circuit["noise"])  # Translate noise
 
         current_datetime = FROM_DATE
         while current_datetime <= TO_DATE:
-            one_month(circuit, current_datetime, beacon_dist)
+            one_month(circuit, current_datetime)
             current_datetime += relativedelta(months=1)
-    with open(Path("data/beacon_dist.json"), "w") as file:
-        json.dump(beacon_dist, file, indent=2)
-    with open(Path("data/power.json"), "w") as file:
-        json.dump(POWER, file, indent=2)
 
 
 def plot_point():
     if os.path.exists(FIGURE_POINT_PATH): shutil.rmtree(FIGURE_POINT_PATH)
-    if os.path.exists(DATA_TABLE_PATH): shutil.rmtree(DATA_TABLE_PATH)
 
     print("\n Plotting for point...")
     dirs = sorted([p for p in DATA_POINT_PATH.glob("*/*") if p.is_dir()])
@@ -156,7 +163,7 @@ def plot_point():
             snrlw = [d["value"] for d in extract("SNR LW", voacapx, band=band)]
             rel = [d["value"] for d in extract("REL", voacapx, band=band)]
 
-            #Compensate for 1-24 hour to 00:00-23:00 hour conversion
+            # Compensate for 1-24 hour to 00:00-23:00 hour conversion
             snr = [snr[-1]] + snr[:-1]
             snrup = [snrup[-1]] + snrup[:-1]
             snrlw = [snrlw[-1]] + snrlw[:-1]
@@ -166,14 +173,11 @@ def plot_point():
         print()
     with open(Path("data/captions.json"), "w") as file:
         json.dump(CAPTIONS, file, indent=2)
-    with open(Path("data/wspr_norm.json"), "w") as file:
-        json.dump(WSPR_NORM, file, indent=2)
-    #magic()
+    # magic()
 
 
 def plot_group():
     if os.path.exists(FIGURE_GROUP_PATH): shutil.rmtree(FIGURE_GROUP_PATH)
-    beacon_dist = json.load(open("data/beacon_dist.json"))
 
     print("\n Plotting for group...")
     dirs = sorted([p for p in DATA_GROUP_PATH.glob("*/*") if p.is_dir()])
@@ -182,14 +186,13 @@ def plot_group():
         bands = sorted(path.glob("*"))
         for band_path in bands:
             print(f"\tPlotting for band: {int(band_path.name)}")
-            make_group_plots(path, band_path.name, beacon_dist)
+            make_group_plots(path, band_path.name)
         print()
     with open(Path("data/captions.json"), "w") as file:
         json.dump(CAPTIONS, file, indent=2)
 
 
 def main():
-
     read_config()
     prep_data()
     plot_point()
