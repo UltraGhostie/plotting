@@ -81,6 +81,9 @@ def plot_errors_bars(dnorm: list, distro: list, path: Path):
     mask = (size != 0)
     s = np.argmax(mask)
     e = len(size) - np.argmax(mask[::-1])
+
+    # print(", ".join(map(str, dsnr)))
+
     fig, ax = plt.subplots(constrained_layout=True)  # figsize=(12, 4)
 
     bar_width = 0.6 / 3
@@ -300,7 +303,7 @@ def calculate_point_rel(wspr_norm: list[dict[str, float]], voacap_rel: list[floa
 
 
 def calculate_point_score(wspr_norm: list[dict[str, float]], voacap_norm: list[dict[str, float]], band: str,
-                          path: Path):
+                          category: str, path: Path):
     cohen = []
     lvr_up = []
     lvr_lw = []
@@ -308,17 +311,12 @@ def calculate_point_score(wspr_norm: list[dict[str, float]], voacap_norm: list[d
         ws, wu, wl = w["snr"], w["up"], w["lw"]
         vs, vu, vl = v["snr"], v["up"], v["lw"]
 
-        cohen.append(np.divide(vs - ws, np.sqrt((wu ** 2 + wl ** 2 + vu ** 2 + vl ** 2) / 4)))
+        den = np.sqrt((wu ** 2 + wl ** 2 + vu ** 2 + vl ** 2) / 4)
+        cohen.append(np.nan if den == 0 else np.divide(vs - ws, den))
 
-        if wu != 0 and vu != 0:
-            lvr_up.append(np.log(vu / wu))
-        else:
-            lvr_up.append(np.nan)
+        lvr_up.append(np.nan if wu == 0 or vu == 0 else np.log(vu / wu))
+        lvr_lw.append(np.nan if wl == 0 or vl == 0 else np.log(vl / wl))
 
-        if wl != 0 and vl != 0:
-            lvr_lw.append(np.log(vl / wl))
-        else:
-            lvr_lw.append(np.nan)
     vs_u, vs_o = 2.0, 0.4
     s_u, s_o = 4.00, 0.8
     m_u, m_o = 6.00, 1.2
@@ -372,28 +370,19 @@ def calculate_point_score(wspr_norm: list[dict[str, float]], voacap_norm: list[d
     file_path = path / "TEMP.json"
     if file_path.exists():
         data = json.load(open(file_path))
-        temp = data.setdefault("SCORE", {})
-        temp = temp.setdefault(band, {})
+        data.setdefault("SCORE", {}).setdefault(category, {}).setdefault(band, {})
 
-        d = temp.setdefault("cohen's d", [])
-        up = temp.setdefault("lvr_up", [])
-        lw = temp.setdefault("lvr_lw", [])
-
-        d.extend(cohen)
-        up.extend(lvr_up)
-        lw.extend(lvr_lw)
-
-        data["SCORE"][band]["cohen's d"] = np.sort(d).tolist()
-        data["SCORE"][band]["lvr_up"] = np.sort(up).tolist()
-        data["SCORE"][band]["lvr_lw"] = np.sort(lw).tolist()
+        data["SCORE"][category][band]["cohen's d"] = np.sort(cohen).tolist()
+        data["SCORE"][category][band]["lvr_up"] = np.sort(lvr_up).tolist()
+        data["SCORE"][category][band]["lvr_lw"] = np.sort(lvr_lw).tolist()
     else:
-        data = {"SCORE": {band:
+        data = {"SCORE": {category: {band:
             {
                 "cohen's d": np.sort(cohen).tolist(),
                 "lvr_up": np.sort(lvr_up).tolist(),
                 "lvr_lw": np.sort(lvr_lw).tolist()
             }
-        }}
+        }}}
     json.dump(data, open(file_path, "w"), indent=2)
     # """
     print()
@@ -476,10 +465,9 @@ def make_point_plots(path: Path, band: str, snr: list[float], snr_up: list[float
     file_path = temp_path / "TEMP.json"
     data = json.load(open(file_path)) if file_path.exists() else {}
     data.setdefault("WSPR_NORM", {})[band] = wspr_norm
-    # with open(file_path, "w") as f:
     json.dump(data, open(file_path, "w"), indent=2)
 
-    calculate_point_score(wspr_norm, voacap_norm, band, temp_path)
+    calculate_point_score(wspr_norm, voacap_norm, band, "SINGLE", temp_path)
     calculate_point_rel(wspr_norm, voacap_rel, count_rel, band, temp_path)
     plot_errors_bars(get_difference_nomral(voacap_norm, wspr_norm), wspr_distro, point_path)
     plot_req_snr(wspr_req_snr, band, temp_path, point_path)
@@ -561,12 +549,15 @@ def make_group_plots(path: Path, band: str):
         entry["snr"] -= power
 
     # Get hourly normal snr distro and total sample size per beacon
-    jsons = sorted(path.glob(f"{band}/*.json"))
     group = {
         file_path.stem.split("_")[1]: {"norm": norm, "samples": samples}
-        for file_path in jsons
+        for file_path in sorted(path.glob(f"{band}/*.json"))
         for norm, _, _, _, samples in [get_per_hour_distros(file_path)]
     }
+
+    center = wspr_norm * len(group)
+    neighbors = [v for g in group.values() for v in g["norm"]]
+    calculate_point_score(center, neighbors, band, "GROUP", temp_path)
 
     # Filter out when one of the beacons lacks data in a band
     dicts = []

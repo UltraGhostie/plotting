@@ -2,7 +2,6 @@ import json
 from datetime import datetime
 from pathlib import Path
 from itertools import zip_longest
-from unicodedata import category
 
 import numpy as np
 
@@ -109,7 +108,11 @@ def gen_req_snr(REQ_SNR, path: Path):
     lines.append(r"\begin{table}[!ht]")
     lines.append(r"\centering")
     lines.append(r"\begin{tabular}{|c|c|} \hline")
-    lines.append(rf"\multicolumn{{2}}{{|c|}}{{\textbf{{{path.parent.name.replace("_", " -- ")}}}}} \\ \hline")
+    lines.append(
+        r"\multicolumn{2}{|c|}" +
+        rf"{{\textbf{{{path.parent.parent.name.replace("_", " -- ")} " +
+        rf"[{datetime.strptime(path.parent.name, "%Y_%m.00").strftime("%B %Y")}]}}}} "
+        r"\\ \hline")
     lines.append(r"\textbf{Band} & \textbf{SNR [dB]} \\ \hline")
 
     mus = np.array([])
@@ -148,7 +151,11 @@ def gen_rel(REL, path: Path):
         lines.append(r"\begin{table}[!ht]")
         lines.append(r"\centering")
         lines.append(r"\begin{tabular}{|c|c|c|c|} \hline")
-        lines.append(rf"\multicolumn{{4}}{{|c|}}{{\textbf{{{path.parent.name.replace("_", " -- ")}}}}} \\ \hline")
+        lines.append(
+            r"\multicolumn{4}{|c|}" +
+            rf"{{\textbf{{{path.parent.parent.name.replace("_", " -- ")} " +
+            rf"[{datetime.strptime(path.parent.name, "%Y_%m.00").strftime("%B %Y")}]}}}} "
+            r"\\ \hline")
         lines.append(r"\textbf{Hour} & \textbf{WSPR} & \textbf{VOACAP} & \textbf{$\Delta$REL} \\ \hline")
 
         for h, (w, v, d) in enumerate(zip(rel_w, rel_v, rel_d)):
@@ -172,7 +179,11 @@ def gen_rel(REL, path: Path):
     lines.append(r"\begin{table}[!ht]")
     lines.append(r"\centering")
     lines.append(r"\begin{tabular}{|c|c|c|c|} \hline")
-    lines.append(rf"\multicolumn{{4}}{{|c|}}{{\textbf{{{path.parent.name.replace("_", " -- ")}}}}} \\ \hline")
+    lines.append(
+        r"\multicolumn{4}{|c|}" +
+        rf"{{\textbf{{{path.parent.parent.name.replace("_", " -- ")} " +
+        rf"[{datetime.strptime(path.parent.name, "%Y_%m.00").strftime("%B %Y")}]}}}} "
+        r"\\ \hline")
     lines.append(
         r"\textbf{Band} \rule{0pt}{2.5ex} & $\overline{\mathrm{\textbf{WSPR}}}$ & $\overline{\mathrm{\textbf{VOACAP}}}$ & $\overline{\Delta\mathrm{\textbf{REL}}}$ \\ \hline")
 
@@ -217,7 +228,7 @@ def score(cohen, lvr_up, lvr_lw):
         ("Large", (m_u, l_u), (m_o, l_o)),
         ("Very Large", (l_u, vl_u), (l_o, vl_o)),
         ("Huge", (vl_u, h_u), (vl_o, h_o)),
-        ("Crazy", (h_u, float("inf")), (h_o, float("inf"))),
+        ("Extreme", (h_u, float("inf")), (h_o, float("inf"))),
     ]
 
     result = {}
@@ -243,29 +254,34 @@ def gen_score(SCORE, path: Path):
 
         COHEN = np.append(COHEN, cohen)
         UP = np.append(UP, up)
-        LW = np.append(LW, up)
+        LW = np.append(LW, lw)
 
         pos = score(cohen[cohen >= 0], up[up >= 0], lw[lw >= 0])
         neg = score(np.abs(cohen[cohen < 0]), np.abs(up[up < 0]), np.abs(lw[lw < 0]))
 
         lines = []
+        lines.append(r"\providecommand{\scorecell}[2]{\makebox[2.5em][r]{#1}/\makebox[2.5em][l]{#2}}")
         lines.append(r"\begin{table}[!ht]")
         lines.append(r"\centering")
         lines.append(r"\begin{tabular}{|c|c|c|c|} \hline")
-        lines.append(rf"\multicolumn{{4}}{{|c|}}{{\textbf{{{path.parent.name.replace("_", " -- ")}}}}} \\ \hline")
         lines.append(
-            r"\textbf{Difference} & \boldmath$\Delta$\textbf{SNR} (+/-)& " +
+            r"\multicolumn{4}{|c|}" +
+            rf"{{\textbf{{{path.parent.parent.name.replace("_", " -- ")} " +
+            rf"[{datetime.strptime(path.parent.name, "%Y_%m.00").strftime("%B %Y")}]}}}} "
+            r"\\ \hline")
+        lines.append(
+            r"\textbf{Difference} & " +
+            r"\boldmath$\Delta$\textbf{SNR} (+/-) & " +
             r"\boldmath{$\Delta\sigma_\mathrm{\textbf{UP}}$} (+/-) &  " +
-            r"\boldmath{$\Delta\sigma_\mathrm{\textbf{LW}}$} (+/-)" +
-            r" \\ \hline")
+            r"\boldmath{$\Delta\sigma_\mathrm{\textbf{LW}}$} (+/-) " +
+            r"\\ \hline")
         for (label, (c_p, u_p, l_p)), (_, (c_n, u_n, l_n)) in zip(pos.items(), neg.items()):
             lines.append(
-                rf"\textbf{{{label}}} & " +
-                rf"{c_p}/{c_n} & " +
-                rf"{u_p}/{u_n} & " +
-                rf"{l_p}/{l_n}" +
+                rf"\textbf{{{label:^10}}} & " +
+                rf"\scorecell{{{c_p} }}{{ {c_n}}} & " +
+                rf"\scorecell{{{u_p} }}{{ {u_n}}} & " +
+                rf"\scorecell{{{l_p} }}{{ {l_n}}}"
                 r" \\ \hline")
-
         lines.append(r"\end{tabular}")
         lines.append(rf"\caption{{Score Comparison (Band: {band})}}")
         lines.append(rf"\label{{tab:{str(file_path)}}}")
@@ -279,21 +295,27 @@ def gen_score(SCORE, path: Path):
     NEG = score(np.abs(COHEN[COHEN < 0]), np.abs(UP[UP < 0]), np.abs(LW[LW < 0]))
 
     lines = []
+    lines.append(r"\providecommand{\scorecell}[2]{\makebox[2.5em][r]{#1}/\makebox[2.5em][l]{#2}}")
     lines.append(r"\begin{table}[!ht]")
     lines.append(r"\centering")
     lines.append(r"\begin{tabular}{|c|c|c|c|} \hline")
-    lines.append(rf"\multicolumn{{4}}{{|c|}}{{\textbf{{{path.parent.name.replace("_", " -- ")}}}}} \\ \hline")
     lines.append(
-        r"\textbf{Difference} & \boldmath$\Delta$\textbf{SNR} (+/-)& " +
+        r"\multicolumn{4}{|c|}" +
+        rf"{{\textbf{{{path.parent.parent.name.replace("_", " -- ")} " +
+        rf"[{datetime.strptime(path.parent.name, "%Y_%m.00").strftime("%B %Y")}]}}}} "
+        r"\\ \hline")
+    lines.append(
+        r"\textbf{Difference} & " +
+        r"\boldmath$\Delta$\textbf{SNR} (+/-) & " +
         r"\boldmath{$\Delta\sigma_\mathrm{\textbf{UP}}$} (+/-) &  " +
-        r"\boldmath{$\Delta\sigma_\mathrm{\textbf{LW}}$} (+/-)" +
-        r" \\ \hline")
+        r"\boldmath{$\Delta\sigma_\mathrm{\textbf{LW}}$} (+/-) " +
+        r"\\ \hline")
     for (label, (c_p, u_p, l_p)), (_, (c_n, u_n, l_n)) in zip(POS.items(), NEG.items()):
         lines.append(
-            rf"\textbf{{{label}}} & " +
-            rf"{c_p}/{c_n} & " +
-            rf"{u_p}/{u_n} & " +
-            rf"{l_p}/{l_n}" +
+            rf"\textbf{{{label:^10}}} & " +
+            rf"\scorecell{{{c_p} }}{{ {c_n}}} & " +
+            rf"\scorecell{{{u_p} }}{{ {u_n}}} & " +
+            rf"\scorecell{{{l_p} }}{{ {l_n}}}"
             r" \\ \hline")
 
     lines.append(r"\end{tabular}")
@@ -309,12 +331,16 @@ def gen_tables():
     for beacon_path in beacon_dirs:
         month_dirs = sorted([p for p in beacon_path.glob("*") if p.is_dir()])
         for month_path in month_dirs:
-            table_path = FIGURE_TABLE_PATH / month_path.relative_to(month_path.parent.parent)
-            table_path.mkdir(parents=True, exist_ok=True)
+            table_path_single = FIGURE_TABLE_PATH / month_path.relative_to(month_path.parent.parent) / "SINGLE"
+            table_path_group = FIGURE_TABLE_PATH / month_path.relative_to(month_path.parent.parent) / "GROUP"
+            table_path_single.mkdir(parents=True, exist_ok=True)
+            table_path_group.mkdir(parents=True, exist_ok=True)
+
             data = json.load(open(month_path / "TEMP.json"))
-            gen_req_snr(data["REQ SNR"], table_path)
-            gen_rel(data["REL"], table_path)
-            gen_score(data["SCORE"], table_path)
+            gen_req_snr(data["REQ SNR"], table_path_single)
+            gen_rel(data["REL"], table_path_single)
+            gen_score(data["SCORE"]["SINGLE"], table_path_single)
+            gen_score(data["SCORE"]["GROUP"], table_path_group)
 
 
 def gen_latex():

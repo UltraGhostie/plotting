@@ -2,7 +2,6 @@ import json
 import math
 import os.path
 import shutil
-
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -10,11 +9,11 @@ from zoneinfo import ZoneInfo
 from dateutil.relativedelta import relativedelta
 from timezonefinder import TimezoneFinder
 
-from tools.wspr import wsprlive_get_info, wsprlive_pull_one_month, wsprlive_get_info_group, wsprlive_get
+from tools.latex import gen_latex
+from tools.plots import make_point_plots, CAPTIONS, make_group_plots
 from tools.voacap import run_voacap
 from tools.voacap_extractor import extract
-from tools.plots import make_point_plots, CAPTIONS, make_group_plots  # , magic
-from tools.latex import gen_latex
+from tools.wspr import wsprlive_get_info, wsprlive_pull_one_month, wsprlive_get_info_group
 
 global FROM_DATE, TO_DATE, CONFIG, SSN_DATA
 
