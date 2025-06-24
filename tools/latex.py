@@ -139,13 +139,13 @@ def gen_req_snr(REQ_SNR, path: Path):
     open(file_path, "w").write("\n".join(lines))
 
 
-def gen_rel(REL, path: Path):
+def gen_rel(REL, WSPR:str, DIFF:str, path: Path, name:bool = False):
     for band, val in REL.items():
-        file_path = path / f"REL_{band}.tex"
+        file_path = path / f"REL_{band}.tex" if not name else path / f"TRUE_REL_{band}.tex"
 
-        avg_w, rel_w = val["WSPR"]["avg"], val["WSPR"]["rel"]
         avg_v, rel_v = val["VOACAP"]["avg"], val["VOACAP"]["rel"]
-        avg_d, rel_d = val["DIFF"]["avg"], val["DIFF"]["rel"]
+        avg_w, rel_w = val[WSPR]["avg"], val[WSPR]["rel"]
+        avg_d, rel_d = val[DIFF]["avg"], val[DIFF]["rel"]
 
         lines = []
         lines.append(r"\begin{table}[!ht]")
@@ -173,7 +173,7 @@ def gen_rel(REL, path: Path):
 
         open(file_path, "w").write("\n".join(lines))
     # ------------------------------------------------
-    file_path = path / "SMOL_REL.tex"
+    file_path = path / "SMOL_REL.tex" if not name else path / "TRUE_SMOL_REL.tex"
 
     lines = []
     lines.append(r"\begin{table}[!ht]")
@@ -191,9 +191,9 @@ def gen_rel(REL, path: Path):
     AVG_V = []
     AVG_D = []
     for band, val in REL.items():
-        avg_w = val["WSPR"]["avg"]
         avg_v = val["VOACAP"]["avg"]
-        avg_d = val["DIFF"]["avg"]
+        avg_w = val[WSPR]["avg"]
+        avg_d = val[DIFF]["avg"]
         AVG_W.append(avg_w)
         AVG_V.append(avg_v)
         AVG_D.append(avg_d)
@@ -338,7 +338,8 @@ def gen_tables():
 
             data = json.load(open(month_path / "TEMP.json"))
             gen_req_snr(data["REQ SNR"], table_path_single)
-            gen_rel(data["REL"], table_path_single)
+            gen_rel(data["REL"], "WSPR", "DIFF", table_path_single)
+            gen_rel(data["REL"], "TRUE", "TRUE DIFF", table_path_single, name=True)
             gen_score(data["SCORE"]["SINGLE"], table_path_single)
             gen_score(data["SCORE"]["GROUP"], table_path_group)
 

@@ -1,4 +1,5 @@
 import json
+import calendar
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -38,6 +39,12 @@ def get_per_hour_distros(path: Path):
     req_snr: list[float] = []
     rel: list[float] = []
 
+    date = datetime.strptime(data[0]["time"], "%Y-%m-%d %H:%M:%S")
+    (_, days_count) = calendar.monthrange(date.year, date.month)
+    times = sorted(datetime.strptime(entry["time"], "%Y-%m-%d %H:%M:%S") for entry in data)
+    min_diff = min((t2 - t1).total_seconds() for t1, t2 in zip(times, times[1:])) / 60
+    total = (days_count * 60) / min_diff
+    print("True REL total:", total)
     for H in HOURS:
         snr_hour = sorted([
             entry["snr"]
@@ -46,6 +53,7 @@ def get_per_hour_distros(path: Path):
             if datetime.strptime(entry["time"], "%Y-%m-%d %H:%M:%S").hour == H
         ])
         size = len(snr_hour)
+        rel.append(size / total)
 
         if size >= 1:
             median = float(np.percentile(snr_hour, 50))
@@ -57,12 +65,10 @@ def get_per_hour_distros(path: Path):
             distro.append({"snr": list(snr), "p": [c / size for c in count], "size": size})
 
             req_snr.append(float(np.percentile(snr_hour, 1)))
-            rel.append(sum(1 for snr in snr_hour if snr >= REQ_SNR) / size)
         else:
             normal.append({"snr": np.nan, "up": np.nan, "lw": np.nan})
             distro.append({"snr": [], "p": [], "size": size})
             req_snr.append(np.nan)
-            rel.append(np.nan)
 
     return normal, distro, req_snr, rel, len(data)
 
@@ -261,13 +267,15 @@ def calculate_point_rel(wspr_norm: list[dict[str, float]], voacap_rel: list[floa
     for n in wspr_norm:
         o = n["lw"] if REQ_SNR > n["snr"] else n["up"]
         interp_rel.append(norm.cdf((n["snr"] - REQ_SNR) / o) if o != 0 else np.nan)
-    # interp_rel = list(np.nan_to_num(interp_rel, nan=0.0))
-    diff_rel = list(np.abs(np.subtract(interp_rel, voacap_rel)))
+    interp_rel = list(np.nan_to_num(interp_rel, nan=0.0))
+    diff_rel = list(np.abs(np.subtract(voacap_rel, interp_rel)))
+    true_diff_rel = list(np.abs(np.subtract(voacap_rel, count_rel)))
 
     REL["WSPR"] = {"avg": np.nanmean(interp_rel), "rel": interp_rel}
-    # REL["DATA"] = {"avg":np.nanmean(count_rel), "rel":count_rel}
+    REL["TRUE"] = {"avg": np.nanmean(count_rel), "rel": count_rel}
     REL["VOACAP"] = {"avg": np.nanmean(voacap_rel), "rel": voacap_rel}
     REL["DIFF"] = {"avg": np.nanmean(diff_rel), "rel": diff_rel}
+    REL["TRUE DIFF"] = {"avg": np.nanmean(true_diff_rel), "rel": true_diff_rel}
 
     file_path = path / "TEMP.json"
     data = json.load(open(file_path)) if file_path.exists() else {}
@@ -281,12 +289,13 @@ def calculate_point_rel(wspr_norm: list[dict[str, float]], voacap_rel: list[floa
         [f"{v:.2f}" if not np.isnan(v) else " -- " for v in interp_rel],
         sep="\t"
     )
-    """print(
-        "DATA",
+    # """
+    print(
+        "TRUE",
         f"{np.nanmean(count_rel):.2f}",
         [f"{v:.2f}" if not np.isnan(v) else " -- " for v in count_rel],
         sep="\t"
-    )"""
+    )  # """
     print(
         "VOA ",
         f"{np.nanmean(voacap_rel):.2f}",
@@ -297,6 +306,12 @@ def calculate_point_rel(wspr_norm: list[dict[str, float]], voacap_rel: list[floa
         "DIFF",
         f"{np.nanmean(diff_rel):.2f}",
         [f"{v:.2f}" if not np.isnan(v) else " -- " for v in diff_rel],
+        sep="\t"
+    )
+    print(
+        "T. DIFF",
+        f"{np.nanmean(true_diff_rel):.2f}",
+        [f"{v:.2f}" if not np.isnan(v) else " -- " for v in true_diff_rel],
         sep="\t"
     )
     print()
