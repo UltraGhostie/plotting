@@ -585,7 +585,7 @@ def make_group_plots(path: Path, band: str):
         for entry in group_norm:
             entry["snr"] -= power
 
-        dnorm = get_difference_nomral(wspr_norm, group_norm)
+        dnorm = get_difference_nomral(group_norm, wspr_norm)
 
         if all(all(np.isnan(v) for v in d.values()) for d in dnorm):
             continue

@@ -139,7 +139,7 @@ def gen_req_snr(REQ_SNR, path: Path):
     open(file_path, "w").write("\n".join(lines))
 
 
-def gen_rel(REL, WSPR:str, DIFF:str, path: Path, name:bool = False):
+def gen_rel(REL, WSPR: str, DIFF: str, path: Path, name: bool = False):
     for band, val in REL.items():
         file_path = path / f"REL_{band}.tex" if not name else path / f"TRUE_REL_{band}.tex"
 
@@ -202,7 +202,7 @@ def gen_rel(REL, WSPR:str, DIFF:str, path: Path, name:bool = False):
     lines.append(
         rf"\textbf{{Total}} & {{\boldmath ${np.mean(AVG_W):.2f}$}} & {{\boldmath ${np.mean(AVG_V):.2f}$}} & {{\boldmath ${np.mean(AVG_D):.2f}$}} \\ \hline")
     lines.append(r"\end{tabular}")
-    lines.append(rf"\caption{{Reliability Comparison (Summary)}}")
+    lines.append(r"\caption{Reliability Comparison (Summary)}")
     lines.append(rf"\label{{tab:{str(file_path)}}}")
     lines.append(r"\end{table}")
 
@@ -275,18 +275,30 @@ def gen_score(SCORE, path: Path):
             r"\boldmath{$\Delta\sigma_\mathrm{\textbf{UP}}$} (+/-) &  " +
             r"\boldmath{$\Delta\sigma_\mathrm{\textbf{LW}}$} (+/-) " +
             r"\\ \hline")
-        for (label, (c_p, u_p, l_p)), (_, (c_n, u_n, l_n)) in zip(pos.items(), neg.items()):
+        n_c, w_c, n_u, w_u, n_l, w_l = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        for i, ((label, (c_p, u_p, l_p)), (_, (c_n, u_n, l_n))) in enumerate(zip(pos.items(), neg.items())):
             lines.append(
                 rf"\textbf{{{label:^10}}} & " +
                 rf"\scorecell{{{c_p} }}{{ {c_n}}} & " +
                 rf"\scorecell{{{u_p} }}{{ {u_n}}} & " +
                 rf"\scorecell{{{l_p} }}{{ {l_n}}}"
                 r" \\ \hline")
+            n_c += c_p + c_n
+            w_c += i * (c_p + c_n)
+
+            n_u += u_p + u_n
+            w_u += i * (u_p + u_n)
+
+            n_l += l_p + l_n
+            w_l += i * (l_p + l_n)
+
+
         lines.append(r"\end{tabular}")
         lines.append(rf"\caption{{Score Comparison (Band: {band})}}")
         lines.append(rf"\label{{tab:{str(file_path)}}}")
         lines.append(r"\end{table}")
 
+        print(file_path.name, f": SNR = {w_c / n_c:.2f}, UP = {w_u / n_u:.2f}, LW = {w_l / n_l:.2f} (Weighted Average)")
         open(file_path, "w").write("\n".join(lines))
     # ------------------------------------------------
     file_path = path / "SMOL_SCORE.tex"
@@ -310,19 +322,29 @@ def gen_score(SCORE, path: Path):
         r"\boldmath{$\Delta\sigma_\mathrm{\textbf{UP}}$} (+/-) &  " +
         r"\boldmath{$\Delta\sigma_\mathrm{\textbf{LW}}$} (+/-) " +
         r"\\ \hline")
-    for (label, (c_p, u_p, l_p)), (_, (c_n, u_n, l_n)) in zip(POS.items(), NEG.items()):
+    n_c, w_c, n_u, w_u, n_l, w_l = 0, 0, 0, 0, 0, 0
+    for i, ((label, (c_p, u_p, l_p)), (_, (c_n, u_n, l_n))) in enumerate(zip(POS.items(), NEG.items())):
         lines.append(
             rf"\textbf{{{label:^10}}} & " +
             rf"\scorecell{{{c_p} }}{{ {c_n}}} & " +
             rf"\scorecell{{{u_p} }}{{ {u_n}}} & " +
             rf"\scorecell{{{l_p} }}{{ {l_n}}}"
             r" \\ \hline")
+        n_c += c_p + c_n
+        w_c += i * (c_p + c_n)
+
+        n_u += u_p + u_n
+        w_u += i * (u_p + u_n)
+
+        n_l += l_p + l_n
+        w_l += i * (l_p + l_n)
 
     lines.append(r"\end{tabular}")
-    lines.append(rf"\caption{{Score Comparison (Summary)}}")
+    lines.append(r"\caption{All Band Score Comparison}")
     lines.append(rf"\label{{tab:{str(file_path)}}}")
     lines.append(r"\end{table}")
 
+    print(file_path.name, f": SNR = {w_c / n_c:.2f}, UP = {w_u / n_u:.2f}, LW = {w_l / n_l:.2f} (Weighted Average)")
     open(file_path, "w").write("\n".join(lines))
 
 
@@ -340,8 +362,12 @@ def gen_tables():
             gen_req_snr(data["REQ SNR"], table_path_single)
             gen_rel(data["REL"], "WSPR", "DIFF", table_path_single)
             gen_rel(data["REL"], "TRUE", "TRUE DIFF", table_path_single, name=True)
+            print("Single")
             gen_score(data["SCORE"]["SINGLE"], table_path_single)
+            print()
+            print("Group")
             gen_score(data["SCORE"]["GROUP"], table_path_group)
+            print()
 
 
 def gen_latex():
