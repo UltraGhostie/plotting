@@ -42,7 +42,7 @@ def get_per_hour_distros(path: Path):
     date = datetime.strptime(data[0]["time"], "%Y-%m-%d %H:%M:%S")
     (_, days_count) = calendar.monthrange(date.year, date.month)
     times = sorted(datetime.strptime(entry["time"], "%Y-%m-%d %H:%M:%S") for entry in data)
-    min_diff = 0 if len(times) < 2 else min((t2 - t1).total_seconds() for t1, t2 in zip(times, times[1:])) / 60
+    min_diff = 2 #0 if len(times) < 2 else min((t2 - t1).total_seconds() for t1, t2 in zip(times, times[1:])) / 60
     total = np.divide((days_count * 60), min_diff)
     print("True REL total:", total)
 
