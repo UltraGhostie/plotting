@@ -571,11 +571,9 @@ def make_group_plots(path: Path, band: str):
         for norm, _, _, _, samples in [get_per_hour_distros(file_path)]
     }
 
-    center = wspr_norm * len(group)
-    neighbors = [v for g in group.values() for v in g["norm"]]
-    calculate_point_score(center, neighbors, band, "GROUP", temp_path)
-
     # Filter out when one of the beacons lacks data in a band
+    center = wspr_norm * len(group)
+    neighbors = []
     dicts = []
     for rx in group:
         group_norm = group[rx]["norm"]
@@ -584,6 +582,7 @@ def make_group_plots(path: Path, band: str):
         power = data["POWER"][f"{TX}_{rx}"]
         for entry in group_norm:
             entry["snr"] -= power
+        neighbors.extend(group_norm)
 
         dnorm = get_difference_nomral(group_norm, wspr_norm)
 
@@ -596,6 +595,8 @@ def make_group_plots(path: Path, band: str):
             "dnorm": dnorm,
             "samples": group[rx]["samples"]
         })
+
+    calculate_point_score(center, neighbors, band, "GROUP", temp_path)
 
     if len(dicts) != 0:
         plot_group_errors_bars(dicts, band, RX, group_path)

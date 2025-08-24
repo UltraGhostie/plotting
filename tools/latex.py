@@ -292,13 +292,13 @@ def gen_score(SCORE, path: Path):
             n_l += l_p + l_n
             w_l += i * (l_p + l_n)
 
-
         lines.append(r"\end{tabular}")
         lines.append(rf"\caption{{Score Comparison (Band: {band})}}")
         lines.append(rf"\label{{tab:{str(file_path)}}}")
         lines.append(r"\end{table}")
 
-        print(file_path.name, f": SNR = {w_c / n_c:.2f}, UP = {w_u / n_u:.2f}, LW = {w_l / n_l:.2f} (Weighted Average)")
+        print(file_path.name, f": SNR = {w_c / n_c:.2f}, UP = {w_u / n_u:.2f}, LW = {w_l / n_l:.2f} (Weighted Average) {(w_c / n_c + w_u / n_u + w_l / n_l) / 3 :.2f}")
+        # print(rf"\textbf{{{band}}}  & \colorcell{{{w_c / n_c:.0f}}} & \colorcell{{{w_u / n_u:.0f}}} & \colorcell{{{w_l / n_l:.0f}}} \\ \hline")
         open(file_path, "w").write("\n".join(lines))
     # ------------------------------------------------
     file_path = path / "SMOL_SCORE.tex"
@@ -344,7 +344,8 @@ def gen_score(SCORE, path: Path):
     lines.append(rf"\label{{tab:{str(file_path)}}}")
     lines.append(r"\end{table}")
 
-    print(file_path.name, f": SNR = {w_c / n_c:.2f}, UP = {w_u / n_u:.2f}, LW = {w_l / n_l:.2f} (Weighted Average)")
+    print(file_path.name, f": SNR = {w_c / n_c:.2f}, UP = {w_u / n_u:.2f}, LW = {w_l / n_l:.2f} (Weighted Average) {(w_c / n_c + w_u / n_u + w_l / n_l) / 3 :.2f}")
+    # print(rf"\textbf{{All}} & \colorcell{{{w_c / n_c:.0f}}} & \colorcell{{{w_u / n_u:.0f}}} & \colorcell{{{w_l / n_l:.0f}}} \\ \hline")
     open(file_path, "w").write("\n".join(lines))
 
 

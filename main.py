@@ -38,7 +38,7 @@ def _r_lon(r: float, rx_lat: float):
 
 
 def dbw_to_watt(dbw):
-    return 10 ** (dbw / 10) / 1000
+    return 10 ** (dbw / 10) / 1000000
 
 
 def haversine(lat1, lon1, lat2, lon2):
@@ -58,7 +58,7 @@ def haversine(lat1, lon1, lat2, lon2):
     return 6371 * c
 
 
-def read_config():
+def read_configs():
     global FROM_DATE, TO_DATE, CONFIG, SSN_DATA
 
     SSN_DATA = json.load(open('data/ssn.json'))
@@ -104,7 +104,7 @@ def one_month(circuit, current_datetime):
 
     # Point to Point
     prefix_path = DATA_POINT_PATH / sub_path
-    local_tz = ZoneInfo(TimezoneFinder().timezone_at(lat=rx_lat, lng=rx_lon))
+    local_tz = ZoneInfo("UTC")#ZoneInfo(TimezoneFinder().timezone_at(lat=rx_lat, lng=rx_lon))
     wsprlive_pull_one_month(TX, RX, current_datetime, local_tz, prefix_path)
 
     print(" Point pull done!\n")
@@ -131,6 +131,7 @@ def one_month(circuit, current_datetime):
 
 
 def prep_data():
+    #if os.path.exists(DATA_TEMP_PATH): shutil.rmtree(DATA_TEMP_PATH)
     if os.path.exists(DATA_POINT_PATH): shutil.rmtree(DATA_POINT_PATH)
     if os.path.exists(DATA_GROUP_PATH): shutil.rmtree(DATA_GROUP_PATH)
 
@@ -192,7 +193,7 @@ def plot_group():
 
 
 def main():
-    read_config()
+    read_configs()
     prep_data()
     plot_point()
     plot_group()
